@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VinAnalytics Group — Inteligencia Vitivinícola</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Variables — Paleta Vitivinícola ───────────────────────────────── */
+    :root {
+      --bg:        #060305;
+      --card:      #0d0810;
+      --card2:     #140d17;
+      --glass:     rgba(255,255,255,0.035);
+      --border:    rgba(180,48,78,0.2);
+      --border-s:  rgba(255,255,255,0.06);
+      --accent:    #9b1f42;
+      --accent2:   #d97a98;
+      --accent-d:  rgba(155,31,66,0.12);
+      --gold:      #c9933a;
+      --gold-d:    rgba(201,147,58,0.12);
+      --success:   #22a35f;
+      --success-d: rgba(34,163,95,0.12);
+      --danger:    #ef4444;
+      --danger-d:  rgba(239,68,68,0.12);
+      --warning:   #d4870f;
+      --text:      #f5eef0;
+      --muted:     #7a6872;
+      --radius:    18px;
+      --radius-s:  10px;
+      --radius-xs: 6px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root { color-scheme: dark; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; font-size: 14px; line-height: 1.5;
+    }
+
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 40% at 5% 0%,  rgba(155,31,66,.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 95% 100%, rgba(201,147,58,.08) 0%, transparent 60%);
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Navbar ─────────────────────────────────────────────────────────── */
+    .navbar {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; height: 62px;
+      background: rgba(10,5,8,.92);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .navbar-brand { display: flex; align-items: center; gap: 14px; }
+    .navbar-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.1rem; font-weight: 800; letter-spacing: .02em; color: var(--text);
+    }
+    .logo-icon { font-size: 1.4rem; filter: drop-shadow(0 0 10px rgba(201,147,58,.5)); }
+    .logo-name span { color: var(--gold); }
+    .logo-group {
+      font-size: .65rem; font-weight: 600; color: var(--muted);
+      letter-spacing: .15em; text-transform: uppercase;
+      display: block; margin-top: -3px;
+    }
+    .navbar-sep { width: 1px; height: 22px; background: var(--border); }
+    .navbar-title { font-size: .82rem; color: var(--muted); font-weight: 500; }
+    .navbar-right { display: flex; align-items: center; gap: 10px; }
+    .btn-refresh {
+      padding: 7px 15px; border-radius: var(--radius-s);
+      background: var(--gold-d); border: 1px solid rgba(201,147,58,.35);
+      color: var(--gold); font-size: .82rem; font-weight: 600;
+      cursor: pointer; transition: all .2s;
+    }
+    .btn-refresh:hover { background: var(--gold); color: #fff; border-color: var(--gold); }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .main { max-width: 1440px; margin: 0 auto; padding: 24px 28px; position: relative; z-index: 1; }
+    section { margin-bottom: 28px; }
+    .section-title {
+      font-size: .72rem; font-weight: 700; letter-spacing: .1em;
+      color: var(--muted); text-transform: uppercase; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── Card ────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--glass); border: 1px solid var(--border-s);
+      border-radius: var(--radius); padding: 22px; backdrop-filter: blur(10px);
+    }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 17px; border-radius: var(--radius-s);
+      font-size: .85rem; font-weight: 600; cursor: pointer;
+      border: none; transition: all .2s; white-space: nowrap;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #6e1430); color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { filter: brightness(1.15); transform: translateY(-1px); }
+    .btn-gold {
+      background: linear-gradient(135deg, var(--gold), #a86e1e); color: #fff;
+    }
+    .btn-gold:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
+    .btn-outline {
+      background: transparent; color: var(--accent2);
+      border: 1px solid rgba(217,122,152,.4);
+    }
+    .btn-outline:hover:not(:disabled) { background: var(--accent-d); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-ghost {
+      background: var(--glass); color: var(--text); border: 1px solid var(--border-s);
+    }
+    .btn-ghost:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent2); }
+    .spinner {
+      display: none; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.25); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    .spinner.on { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ETL Panel ───────────────────────────────────────────────────────── */
+    .etl-toggle-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 15px 22px;
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: var(--radius); cursor: pointer; user-select: none;
+      transition: border-color .2s, background .2s; backdrop-filter: blur(10px);
+    }
+    .etl-toggle-bar:hover { border-color: var(--gold); background: rgba(201,147,58,.04); }
+    .etl-toggle-left { display: flex; align-items: center; gap: 12px; font-weight: 700; }
+    .etl-badge {
+      font-size: .7rem; padding: 3px 10px; border-radius: 99px;
+      background: var(--gold-d); color: var(--gold); font-weight: 700;
+      border: 1px solid rgba(201,147,58,.25);
+    }
+    .etl-pipeline { display: flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 700; }
+    .etl-step { padding: 2px 10px; border-radius: 99px; font-weight: 800; letter-spacing: .04em; }
+    .step-csv { background: rgba(96,165,250,.15); color: #60a5fa; border: 1px solid rgba(96,165,250,.25); }
+    .step-e { background: rgba(34,163,95,.15);  color: #4ade80; border: 1px solid rgba(34,163,95,.25); }
+    .step-t { background: rgba(201,147,58,.15); color: var(--gold); border: 1px solid rgba(201,147,58,.25); }
+    .step-l { background: rgba(155,31,66,.15);  color: var(--accent2); border: 1px solid rgba(155,31,66,.25); }
+    .step-arrow { color: var(--muted); font-size: .9rem; }
+    .etl-arrow { transition: transform .3s; font-size: .9rem; color: var(--muted); }
+    .etl-arrow.open { transform: rotate(180deg); }
+    .etl-body { overflow: hidden; max-height: 0; transition: max-height .4s ease, opacity .3s; opacity: 0; }
+    .etl-body.open { max-height: 1000px; opacity: 1; }
+    .etl-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; padding: 22px 0 0; }
+    @media (max-width: 768px) { .etl-inner { grid-template-columns: 1fr; } }
+    .etl-buttons { display: flex; flex-direction: column; gap: 10px; }
+    .etl-step-label {
+      font-size: .72rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; margin-bottom: 2px;
+    }
+    .etl-row { display: flex; align-items: center; gap: 8px; }
+    .etl-row input[type="number"],
+    .etl-row select {
+      padding: 9px 11px; border-radius: var(--radius-s);
+      background: #140d17; border: 1px solid var(--border-s);
+      color: var(--text); font-size: .84rem;
+    }
+    .etl-row select { cursor: pointer; }
+    .etl-row input:focus, .etl-row select:focus { outline: none; border-color: var(--gold); }
+    .etl-log-panel { display: flex; flex-direction: column; gap: 8px; }
+    .etl-log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: .72rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .08em;
+    }
+    .btn-clear-log {
+      font-size: .74rem; padding: 3px 9px; border-radius: var(--radius-xs);
+      background: transparent; border: 1px solid var(--border-s);
+      color: var(--muted); cursor: pointer; transition: all .2s;
+    }
+    .btn-clear-log:hover { border-color: var(--gold); color: var(--gold); }
+    #etl-log {
+      background: rgba(0,0,0,.55); color: #86efac;
+      font-family: 'Courier New', 'Consolas', monospace;
+      font-size: .77rem; padding: 14px; border-radius: var(--radius-s);
+      height: 220px; overflow-y: auto; white-space: pre-wrap;
+      word-break: break-all; border: 1px solid rgba(134,239,172,.1);
+    }
+    .etl-status-bar {
+      margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border-s);
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;
+    }
+    .status-item {
+      display: flex; align-items: flex-start; gap: 9px;
+      background: rgba(0,0,0,.25); border-radius: var(--radius-s);
+      padding: 11px 13px; border: 1px solid var(--border-s);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+    .dot.green { background: var(--success); box-shadow: 0 0 7px var(--success); }
+    .dot.red   { background: var(--danger);  box-shadow: 0 0 7px var(--danger); }
+    .dot.gray  { background: var(--muted); }
+    .status-info { display: flex; flex-direction: column; }
+    .status-label { font-size: .7rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .status-value { font-size: .88rem; font-weight: 700; color: var(--text); margin-top: 1px; }
+
+    /* ── KPI Grid ────────────────────────────────────────────────────────── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+    @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 700px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    .kpi {
+      background: var(--glass); border: 1px solid var(--border-s);
+      border-radius: var(--radius); padding: 20px 18px;
+      transition: transform .2s, box-shadow .2s, border-color .2s;
+      position: relative; overflow: hidden; backdrop-filter: blur(8px);
+    }
+    .kpi::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      border-radius: 3px 0 0 3px;
+      background: linear-gradient(180deg, var(--gold), var(--accent));
+    }
+    .kpi::after {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      background: linear-gradient(135deg, rgba(201,147,58,.04), transparent);
+      opacity: 0; transition: opacity .2s;
+    }
+    .kpi:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(155,31,66,.2); border-color: var(--accent); }
+    .kpi:hover::after { opacity: 1; }
+    .kpi-icon  { font-size: 1.4rem; margin-bottom: 10px; line-height: 1; }
+    .kpi-label { font-size: .69rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .kpi-val   { font-size: 2rem; font-weight: 800; color: var(--text); line-height: 1.15; margin: 5px 0 2px; }
+    .kpi-sub   { font-size: .72rem; color: var(--muted); }
+    .skeleton {
+      background: linear-gradient(90deg, var(--card) 25%, var(--card2) 50%, var(--card) 75%);
+      background-size: 200% 100%; animation: shimmer 1.4s infinite;
+      border-radius: 6px; color: transparent !important; user-select: none;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ── Filters ─────────────────────────────────────────────────────────── */
+    .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .fg { display: flex; flex-direction: column; gap: 5px; }
+    .fg label { font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .fg select, .fg input {
+      padding: 9px 12px; border-radius: var(--radius-s);
+      background: #140d17; border: 1px solid var(--border-s);
+      color: var(--text); font-size: .88rem; width: 100%; transition: border-color .2s, box-shadow .2s;
+    }
+    .fg select:focus, .fg input:focus {
+      outline: none; border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(201,147,58,.1);
+    }
+    select option {
+      background-color: #140d17;
+      color: #f5eef0;
+    }
+    .filter-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* ── Charts ──────────────────────────────────────────────────────────── */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+    .chart-card {
+      background: var(--glass); border: 1px solid var(--border-s);
+      border-radius: var(--radius); padding: 22px; backdrop-filter: blur(8px);
+    }
+    .chart-title { font-size: .88rem; font-weight: 700; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .chart-wrap  { position: relative; height: 280px; }
+    .chart-empty {
+      display: flex; align-items: center; justify-content: center;
+      height: 280px; color: var(--muted); font-size: .88rem;
+      border: 1px dashed var(--border-s); border-radius: var(--radius-s);
+    }
+
+    /* ── Table ───────────────────────────────────────────────────────────── */
+    .table-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+    .table-info { font-size: .85rem; color: var(--muted); }
+    .table-info strong { color: var(--text); }
+    .per-page-wrap { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: var(--muted); }
+    .per-page-wrap select {
+      padding: 6px 10px; border-radius: var(--radius-s);
+      background: #140d17; border: 1px solid var(--border-s);
+      color: var(--text); font-size: .82rem;
+    }
+    .table-wrap { overflow-x: auto; border-radius: var(--radius-s); border: 1px solid var(--border-s); }
+    table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; }
+    thead { background: rgba(6,3,5,.95); }
+    th {
+      padding: 13px 16px; text-align: left;
+      font-size: .68rem; font-weight: 700; color: var(--gold);
+      text-transform: uppercase; letter-spacing: .06em;
+      border-bottom: 2px solid rgba(201,147,58,.25); white-space: nowrap;
+    }
+    td {
+      padding: 11px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      vertical-align: middle; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    /* Anchos de columnas */
+    table th:nth-child(1), table td:nth-child(1) { width: 22%; }
+    table th:nth-child(2), table td:nth-child(2) { width: 14%; }
+    table th:nth-child(3), table td:nth-child(3) { width: 8%; }
+    table th:nth-child(4), table td:nth-child(4) { width: 14%; }
+    table th:nth-child(5), table td:nth-child(5) { width: 10%; }
+    table th:nth-child(6), table td:nth-child(6) { width: 8%; text-align: center; }
+    table th:nth-child(7), table td:nth-child(7) { width: 8%; text-align: right; }
+    table th:nth-child(8), table td:nth-child(8) { width: 16%; }
+
+    tbody tr { transition: background .15s; }
+    tbody tr:nth-child(even) { background: rgba(255,255,255,.018); }
+    tbody tr:hover { background: rgba(155,31,66,.08); }
+    tr:last-child td { border-bottom: none; }
+    .badge { display: inline-flex; align-items: center; justify-content: center;
+             padding: 3px 10px; border-radius: 99px; font-size: .75rem; font-weight: 700; }
+    .badge-pts    { background: rgba(34,163,95,.15);  color: #4ade80; border: 1px solid rgba(34,163,95,.25); min-width: 42px; }
+    .badge-pts-hi { background: rgba(201,147,58,.18); color: var(--gold); border: 1px solid rgba(201,147,58,.3); min-width: 42px; }
+    .mono { font-family: 'Courier New', monospace; font-size: .79rem; color: var(--muted); }
+    .td-price { font-weight: 700; color: var(--gold); }
+    .td-empty { text-align: center; color: var(--muted); padding: 48px; }
+
+    /* ── Pagination ──────────────────────────────────────────────────────── */
+    .pagination { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 18px; }
+    .page-btn {
+      padding: 7px 15px; border-radius: var(--radius-s);
+      background: rgba(255,255,255,.04); border: 1px solid var(--border-s);
+      color: var(--text); font-size: .82rem; cursor: pointer; transition: all .2s;
+    }
+    .page-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+    .page-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .page-info { font-size: .84rem; color: var(--muted); padding: 0 8px; }
+
+    /* ── Toast ───────────────────────────────────────────────────────────── */
+    #toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      padding: 12px 18px; border-radius: var(--radius-s);
+      font-size: .85rem; font-weight: 600; color: #fff;
+      animation: toast-in .3s ease; display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.6); backdrop-filter: blur(10px);
+    }
+    .toast.success { background: rgba(34,163,95,.9); border: 1px solid var(--success); }
+    .toast.error   { background: rgba(239,68,68,.9);  border: 1px solid var(--danger); }
+    .toast.info    { background: rgba(155,31,66,.9);  border: 1px solid var(--accent2); }
+    @keyframes toast-in { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ── Modal ───────────────────────────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,.65); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity .25s;
+    }
+    .modal-backdrop.show { opacity: 1; pointer-events: all; }
+    .modal {
+      background: linear-gradient(145deg, #110810, #1a0d18);
+      border: 1px solid rgba(201,147,58,.3);
+      border-radius: var(--radius); padding: 32px 36px;
+      max-width: 420px; width: 90%;
+      box-shadow: 0 24px 80px rgba(0,0,0,.8), 0 0 0 1px rgba(155,31,66,.15);
+      transform: translateY(14px); transition: transform .25s;
+    }
+    .modal-backdrop.show .modal { transform: translateY(0); }
+    .modal-icon { font-size: 2.4rem; text-align: center; margin-bottom: 14px; }
+    .modal-title {
+      font-size: 1.05rem; font-weight: 800; color: var(--text);
+      text-align: center; margin-bottom: 10px;
+    }
+    .modal-body {
+      font-size: .88rem; color: var(--muted); text-align: center;
+      line-height: 1.6; margin-bottom: 24px;
+    }
+    .modal-body strong { color: var(--accent2); }
+    .modal-note {
+      font-size: .78rem; color: var(--muted);
+      background: rgba(155,31,66,.08); border: 1px solid rgba(155,31,66,.15);
+      border-radius: var(--radius-s); padding: 10px 14px;
+      margin-bottom: 24px; text-align: center; line-height: 1.5;
+    }
+    .modal-actions { display: flex; gap: 12px; }
+    .modal-actions .btn { flex: 1; justify-content: center; padding: 11px; }
+
+    /* ── Scrollbar ───────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(155,31,66,.35); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ───────────────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="navbar-logo">
+      <span class="logo-icon">🍷</span>
+      <div class="logo-name">
+        Vin<span>Analytics</span>
+        <span class="logo-group">Group</span>
+      </div>
+    </div>
+    <div class="navbar-sep"></div>
+    <span class="navbar-title">Plataforma de Inteligencia Vitivinícola</span>
+  </div>
+  <div class="navbar-right">
+    <a href="/" style="color:#ccc;text-decoration:none;font-size:13px;margin-right:12px;">← Inicio</a>
+    {% if show_admin %}
+      <a href="/auditoria" style="color:#ccc;text-decoration:none;font-size:13px;margin-right:12px;">Auditoría</a>
+      <a href="/usuarios"  style="color:#ccc;text-decoration:none;font-size:13px;margin-right:12px;">Usuarios</a>
+      <a href="/respaldos" style="color:#ccc;text-decoration:none;font-size:13px;margin-right:12px;">Respaldos</a>
+    {% endif %}
+    <button class="btn-refresh" onclick="reloadDashboard()">&#8635; Actualizar</button>
+  </div>
+</nav>
+
+<div class="main">
+
+  {% if show_admin %}
+  <!-- ── Panel ETL ────────────────────────────────────────────────────── -->
+  <section>
+    <div class="etl-toggle-bar" onclick="toggleEtl()">
+      <div class="etl-toggle-left">
+        <span>⚙</span>
+        <span>Pipeline ETL</span>
+        <span class="etl-badge">StarRocks</span>
+        <div class="etl-pipeline">
+          <span class="etl-step step-csv">CSV</span>
+          <span class="step-arrow">→</span>
+          <span class="etl-step step-e">E</span>
+          <span class="step-arrow">→</span>
+          <span class="etl-step step-t">T</span>
+          <span class="step-arrow">→</span>
+          <span class="etl-step step-l">L</span>
+        </div>
+      </div>
+      <span class="etl-arrow" id="etl-arrow">&#9660;</span>
+    </div>
+
+    <div class="etl-body" id="etl-body">
+      <div class="etl-inner">
+
+        <div class="etl-buttons">
+          <div class="section-title">Acciones del Pipeline</div>
+
+          <button class="btn btn-ghost" id="btn-pb"
+                  data-label="Verificar PocketBase"
+                  onclick="verificarPB()">
+            <span class="spinner" id="sp-pb"></span>
+            🔎 Verificar PocketBase
+          </button>
+
+          <div class="etl-step-label">📂 Paso 0 — Cargar datos a PocketBase</div>
+          <button class="btn btn-outline" id="btn-csv"
+                  data-label="📤 Cargar CSV → PocketBase"
+                  onclick="etlAction('csv')">
+            <span class="spinner" id="sp-csv"></span>
+            📤 Cargar CSV → PocketBase
+          </button>
+          <button class="btn btn-outline" id="btn-generar"
+                  data-label="🎲 Generar 100k Aleatorios → PocketBase"
+                  onclick="generarAleatorio()">
+            <span class="spinner" id="sp-generar"></span>
+            🎲 Generar 100k Aleatorios → PocketBase
+          </button>
+
+          <div class="etl-step-label">🟢 E — Extracción</div>
+          <button class="btn btn-ghost" id="btn-extraer"
+                  data-label="Extraer PocketBase → Parquet"
+                  onclick="etlAction('extraer')">
+            <span class="spinner" id="sp-extraer"></span>
+            Extraer PocketBase → Parquet
+          </button>
+
+          <div class="etl-step-label">🟡 T — Transformación</div>
+          <button class="btn btn-ghost" id="btn-transformar"
+                  data-label="Transformar y construir dimensiones"
+                  onclick="etlAction('transformar')">
+            <span class="spinner" id="sp-transformar"></span>
+            Transformar y construir dimensiones
+          </button>
+
+          <div class="etl-step-label">🔴 L — Carga a StarRocks</div>
+          <div class="etl-row">
+            <select id="sr-limite" style="flex:1">
+              <option value="0">Completo (~129,971 registros)</option>
+              <option value="100000">100,000 registros</option>
+              <option value="50000">50,000 registros</option>
+              <option value="25000">25,000 registros</option>
+            </select>
+            <button class="btn btn-gold" id="btn-starrocks"
+                    data-label="Cargar → StarRocks"
+                    onclick="etlAction('starrocks')" style="flex:2">
+              <span class="spinner" id="sp-starrocks"></span>
+              Cargar → StarRocks
+            </button>
+          </div>
+
+          <button class="btn btn-danger" id="btn-reset"
+                  data-label="⚠ Reset StarRocks"
+                  onclick="resetStarRocks()">
+            <span class="spinner" id="sp-reset"></span>
+            ⚠ Reset StarRocks
+          </button>
+        </div>
+
+        <div class="etl-log-panel">
+          <div class="section-title">Log de ejecución</div>
+          <div class="etl-log-header">
+            <span>Salida del proceso</span>
+            <button class="btn-clear-log" onclick="clearLog()">Limpiar</button>
+          </div>
+          <pre id="etl-log">— Esperando acciones del pipeline ETL —</pre>
+        </div>
+      </div>
+
+      <div class="etl-status-bar">
+        <div class="status-item">
+          <span class="dot gray" id="dot-pb"></span>
+          <div class="status-info">
+            <span class="status-label">PocketBase</span>
+            <span class="status-value" id="val-pb">—</span>
+          </div>
+        </div>
+        <div class="status-item">
+          <span class="dot gray" id="dot-raw"></span>
+          <div class="status-info">
+            <span class="status-label">Parquet Raw</span>
+            <span class="status-value" id="val-raw">—</span>
+          </div>
+        </div>
+        <div class="status-item">
+          <span class="dot gray" id="dot-clean"></span>
+          <div class="status-info">
+            <span class="status-label">Parquet Clean</span>
+            <span class="status-value" id="val-clean">—</span>
+          </div>
+        </div>
+        <div class="status-item">
+          <span class="dot gray" id="dot-fact"></span>
+          <div class="status-info">
+            <span class="status-label">fact_resenas</span>
+            <span class="status-value" id="val-fact">—</span>
+          </div>
+        </div>
+        <div class="status-item">
+          <span class="dot gray" id="dot-dims"></span>
+          <div class="status-info">
+            <span class="status-label">Dimensiones</span>
+            <span class="status-value" id="val-dims">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% endif %}
+
+  <!-- ── KPIs ─────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Indicadores Clave — VinAnalytics Group</div>
+    <div class="kpi-grid">
+      <div class="kpi" id="kpi-resenas">
+        <div class="kpi-icon">🍷</div>
+        <div class="kpi-label">Total Reseñas</div>
+        <div class="kpi-val skeleton" style="width:90px;height:36px">0</div>
+        <div class="kpi-sub">vinos evaluados</div>
+      </div>
+      <div class="kpi" id="kpi-pts">
+        <div class="kpi-icon">⭐</div>
+        <div class="kpi-label">Puntuación Promedio</div>
+        <div class="kpi-val skeleton" style="width:70px;height:36px">0</div>
+        <div class="kpi-sub">puntos / 100</div>
+      </div>
+      <div class="kpi" id="kpi-precio">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-label">Precio Promedio</div>
+        <div class="kpi-val skeleton" style="width:80px;height:36px">$0</div>
+        <div class="kpi-sub" id="kpi-precio-sub"></div>
+      </div>
+      <div class="kpi" id="kpi-paises">
+        <div class="kpi-icon">🌍</div>
+        <div class="kpi-label">Total Países</div>
+        <div class="kpi-val skeleton" style="width:60px;height:36px">0</div>
+        <div class="kpi-sub">regiones vitivinícolas</div>
+      </div>
+      <div class="kpi" id="kpi-variedades">
+        <div class="kpi-icon">🌿</div>
+        <div class="kpi-label">Total Variedades</div>
+        <div class="kpi-val skeleton" style="width:60px;height:36px">0</div>
+        <div class="kpi-sub">cepas distintas</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Filtros ───────────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Filtros de Análisis</div>
+    <div class="card">
+      <div class="filter-grid">
+        <div class="fg">
+          <label>País</label>
+          <select id="f-pais"><option value="">Todos</option></select>
+        </div>
+        <div class="fg">
+          <label>Variedad</label>
+          <select id="f-variedad"><option value="">Todas</option></select>
+        </div>
+        <div class="fg">
+          <label>Bodega</label>
+          <input type="text" id="f-bodega" placeholder="Nombre bodega..."/>
+        </div>
+        <div class="fg">
+          <label>Puntos mínimos</label>
+          <input type="number" id="f-puntos" placeholder="80" min="80" max="100" step="1"/>
+        </div>
+        <div class="fg">
+          <label>Precio máximo ($)</label>
+          <input type="number" id="f-precio" placeholder="999" min="0" step="1"/>
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-gold"  onclick="applyFilters()">🔍 Aplicar filtros</button>
+        <button class="btn btn-ghost" onclick="clearFilters()">✕ Limpiar</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Gráficas ──────────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Visualizaciones Analíticas</div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">🌍 Puntuación Promedio por País</div>
+        <div class="chart-wrap"><canvas id="chart-paises"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🌿 Top Variedades por Precio Promedio</div>
+        <div class="chart-wrap"><canvas id="chart-variedades"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">📊 Distribución de Puntuaciones</div>
+        <div class="chart-wrap"><canvas id="chart-puntuacion"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🏰 Top Bodegas por Puntuación</div>
+        <div class="chart-wrap"><canvas id="chart-bodegas"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tabla ─────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Registro de Reseñas de Vino</div>
+    <div class="card">
+      <div class="table-controls">
+        <div class="table-info" id="table-info">Cargando datos...</div>
+        <div class="per-page-wrap">
+          Registros por página:
+          <select id="per-page" onchange="changePerPage()">
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Variedad</th>
+              <th>País</th>
+              <th>Bodega</th>
+              <th>Provincia</th>
+              <th>Puntos</th>
+              <th>Precio</th>
+              <th>Catador</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr><td class="td-empty" colspan="8">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <button class="page-btn" id="btn-prev" onclick="changePage(-1)">← Anterior</button>
+        <span class="page-info" id="page-info">—</span>
+        <button class="page-btn" id="btn-next" onclick="changePage(1)">Siguiente →</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div id="toast-wrap"></div>
+
+<!-- ── Modal de confirmación ────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <div class="modal-icon" id="modal-icon">🎲</div>
+    <div class="modal-title" id="modal-title">Generar Reseñas Aleatorias</div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-note" id="modal-note"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal(false)">Cancelar</button>
+      <button class="btn" id="modal-confirm-btn" onclick="closeModal(true)">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Paleta Chart.js ──────────────────────────────────────────────────── */
+const PALETTE = [
+  '#d97a98','#c9933a','#4ade80','#f87171',
+  '#60a5fa','#a78bfa','#34d399','#fb923c',
+  '#e879f9','#22d3ee','#fbbf24','#a3e635',
+];
+
+Chart.defaults.color       = '#7a6872';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+const S = {
+  page: 1, perPage: 50, totalPages: 1,
+  charts: {}, etlOpen: false, polling: null, busy: false,
+};
+
+const fmt     = n => Number(n).toLocaleString('es-MX');
+const fmtUSD  = n => `$${Number(n).toFixed(2)}`;
+const fmtBytes = b => b >= 1_048_576
+  ? `${(b/1_048_576).toFixed(1)} MB`
+  : `${(b/1_024).toFixed(0)} KB`;
+
+function showToast(msg, type = 'info', duration = 4000) {
+  const icons = { success: '✓', error: '✗', info: 'ℹ' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = `${icons[type] || ''} ${msg}`;
+  document.getElementById('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+function addLog(text) {
+  const el = document.getElementById('etl-log');
+  const ts = new Date().toLocaleTimeString('es-MX');
+  el.textContent += `\n[${ts}] ${text}`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('etl-log').textContent = '— Log limpiado —';
+}
+
+function setBusy(id, busy) {
+  const btn = document.getElementById(id);
+  const key = id.replace('btn-','');
+  const sp  = document.getElementById(`sp-${key}`);
+  if (!btn) return;
+  btn.disabled = busy;
+  if (sp) sp.classList.toggle('on', busy);
+  if (!busy) btn.innerHTML = `<span class="spinner" id="sp-${key}"></span>${btn.dataset.label}`;
+}
+
+function toggleEtl() {
+  S.etlOpen = !S.etlOpen;
+  document.getElementById('etl-body').classList.toggle('open', S.etlOpen);
+  document.getElementById('etl-arrow').classList.toggle('open', S.etlOpen);
+}
+
+const ETL_ENDPOINTS = {
+  csv:        '/etl/cargar-pocketbase',
+  extraer:    '/etl/extraer',
+  transformar:'/etl/transformar',
+  starrocks:  '/etl/cargar-starrocks',
+};
+
+async function etlAction(name) {
+  if (S.busy) { showToast('Hay una operación en curso', 'info'); return; }
+  const id  = `btn-${name}`;
+  const btn = document.getElementById(id);
+  const label = btn.dataset.label;
+  let body = null;
+  if (name === 'starrocks') {
+    const n = parseInt(document.getElementById('sr-limite').value);
+    if (n > 0) body = { limit: n };
+  }
+  S.busy = true;
+  setBusy(id, true);
+  btn.innerHTML = `<span class="spinner on" id="sp-${name}"></span> Ejecutando...`;
+  addLog(`▶ Iniciando: ${label}...`);
+  try {
+    const resp = await fetch(ETL_ENDPOINTS[name], {
+      method: 'POST',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body:    body ? JSON.stringify(body) : null,
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+    addLog(`✓ Completado: ${label}\n${(data.log || 'OK').trim()}`);
+    showToast(`${label} completado`, 'success');
+    await checkEtlStatus();
+  } catch (err) {
+    addLog(`✗ Error en ${label}: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
+  } finally {
+    S.busy = false;
+    setBusy(id, false);
+  }
+}
+
+async function verificarPB() {
+  if (S.busy) { showToast('Hay una operación en curso', 'info'); return; }
+  const id  = 'btn-pb';
+  const btn = document.getElementById(id);
+  S.busy = true; setBusy(id, true);
+  btn.innerHTML = '<span class="spinner on" id="sp-pb"></span> Verificando...';
+  addLog('▶ Verificando PocketBase...');
+  try {
+    const d = await (await fetch('/etl/status')).json();
+    const pbOk = d.pocketbase_accesible;
+    const factN = d.starrocks?.fact_resenas;
+    const lines = [
+      `PocketBase: ${pbOk ? 'Conectado ✓' : 'Sin conexión ✗'}`,
+      d.pocketbase_registros != null ? `Registros en PocketBase: ${fmt(d.pocketbase_registros)}` : '',
+      factN != null ? `fact_resenas (StarRocks): ${fmt(factN)}` : '',
+    ].filter(Boolean).join('\n');
+    addLog(`✓ Estado del sistema:\n${lines}`);
+    showToast(pbOk ? 'PocketBase conectado' : 'PocketBase sin conexión', pbOk ? 'success' : 'error');
+    await checkEtlStatus();
+  } catch (err) {
+    addLog(`✗ Error: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
+  } finally {
+    S.busy = false; setBusy(id, false);
+  }
+}
+
+async function resetStarRocks() {
+  if (S.busy) { showToast('Hay una operación en curso', 'info'); return; }
+  const confirmed = await openModal({
+    icon: '⚠',
+    title: 'Reset de StarRocks',
+    body: 'Esto <strong>borrará todas las tablas</strong> de StarRocks y las recreará vacías.',
+    note: '🗑 Se perderán todos los datos cargados. Esta acción no se puede deshacer.',
+    btnLabel: '⚠ Sí, resetear',
+    btnClass: 'btn-danger',
+  });
+  if (!confirmed) return;
+  const id  = 'btn-reset';
+  const btn = document.getElementById(id);
+  S.busy = true; setBusy(id, true);
+  btn.innerHTML = `<span class="spinner on"></span> Reseteando...`;
+  addLog('▶ Iniciando reset de StarRocks...');
+  try {
+    const resp = await fetch('/etl/reset-starrocks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmar: true }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+    addLog(`✓ Reset completado.\n${(data.log || 'OK').trim()}`);
+    showToast('StarRocks reseteado correctamente', 'success');
+    await checkEtlStatus();
+    await reloadDashboard();
+  } catch (err) {
+    addLog(`✗ Error en reset: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
+  } finally {
+    S.busy = false; setBusy(id, false);
+  }
+}
+
+async function checkEtlStatus() {
+  try {
+    const d = await (await fetch('/etl/status')).json();
+    const pbOk = d.pocketbase_accesible;
+    _setDot('dot-pb', pbOk);
+    _setVal('val-pb', pbOk ? `Conectado (${fmt(d.pocketbase_registros ?? 0)})` : 'Sin conexión');
+
+    const rawBytes = d.stage?.['wine_raw.parquet'];
+    _setDot('dot-raw', rawBytes != null);
+    _setVal('val-raw', rawBytes != null ? fmtBytes(rawBytes) : 'No existe');
+
+    const cleanBytes = d.stage?.['wine_clean.parquet'];
+    _setDot('dot-clean', cleanBytes != null);
+    _setVal('val-clean', cleanBytes != null ? fmtBytes(cleanBytes) : 'No existe');
+
+    const factN = d.starrocks?.fact_resenas;
+    _setDot('dot-fact', factN > 0);
+    _setVal('val-fact', factN === -1 ? 'Tabla no existe' : fmt(factN ?? 0));
+
+    const dims = ['dim_pais','dim_variedad','dim_bodega','dim_provincia','dim_region','dim_catador'];
+    const loaded = dims.filter(t => (d.starrocks?.[t] ?? 0) > 0).length;
+    _setDot('dot-dims', loaded === dims.length);
+    _setVal('val-dims', `${loaded}/${dims.length} cargadas`);
+  } catch (_) {}
+}
+
+function _setDot(id, ok) {
+  const el = document.getElementById(id);
+  if (el) el.className = `dot ${ok ? 'green' : 'red'}`;
+}
+function _setVal(id, txt) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = txt;
+}
+
+function startPolling() {
+  if (S.polling) clearInterval(S.polling);
+  S.polling = setInterval(checkEtlStatus, 10_000);
+}
+
+async function loadKPIs() {
+  try {
+    const d = await (await fetch('/api/kpis')).json();
+    if (d.error) throw new Error(d.error);
+    _kpi('kpi-resenas',   fmt(d.total_resenas));
+    _kpi('kpi-pts',       d.puntuacion_promedio?.toFixed(1) ?? '—');
+    _kpi('kpi-precio',    fmtUSD(d.precio_promedio));
+    _kpi('kpi-paises',    fmt(d.total_paises));
+    _kpi('kpi-variedades',fmt(d.total_variedades));
+    document.getElementById('kpi-precio-sub').textContent =
+      `min ${fmtUSD(d.precio_minimo)} — max ${fmtUSD(d.precio_maximo)}`;
+  } catch (_) {
+    ['kpi-resenas','kpi-pts','kpi-precio','kpi-paises','kpi-variedades'].forEach(id => _kpi(id, '—'));
+  }
+}
+
+function _kpi(id, val) {
+  const el = document.getElementById(id)?.querySelector('.kpi-val');
+  if (!el) return;
+  el.classList.remove('skeleton');
+  el.style.width = el.style.height = '';
+  el.textContent = val;
+}
+
+function _destroyChart(key) {
+  if (S.charts[key]) { S.charts[key].destroy(); delete S.charts[key]; }
+}
+
+function _baseOpts(extra = {}) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#7a6872', boxWidth: 14, font: { size: 12 } } } },
+    ...extra,
+  };
+}
+
+const GRID_COLOR = 'rgba(155,31,66,.08)';
+
+async function loadChartPaises() {
+  _destroyChart('paises');
+  const canvas = document.getElementById('chart-paises');
+  try {
+    const rows = await (await fetch('/api/graficas/paises')).json();
+    if (rows.error || !rows.length) { _empty(canvas); return; }
+    S.charts.paises = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.pais),
+        datasets: [{
+          label: 'Puntuación promedio',
+          data: rows.map(r => r.puntuacion),
+          backgroundColor: PALETTE.map(c => c + 'cc'),
+          borderColor: PALETTE, borderWidth: 1, borderRadius: 5,
+        }],
+      },
+      options: _baseOpts({
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: false, min: 80, grid: { color: GRID_COLOR }, ticks: { color: '#7a6872' } },
+          y: { ticks: { font: { size: 11 }, color: '#7a6872' } },
+        },
+      }),
+    });
+  } catch (_) { _empty(canvas); }
+}
+
+async function loadChartVariedades() {
+  _destroyChart('variedades');
+  const canvas = document.getElementById('chart-variedades');
+  try {
+    const rows = await (await fetch('/api/graficas/variedades')).json();
+    if (rows.error || !rows.length) { _empty(canvas); return; }
+    S.charts.variedades = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.variedad),
+        datasets: [{
+          label: 'Precio promedio ($)',
+          data: rows.map(r => r.precio_promedio),
+          backgroundColor: PALETTE[1] + 'cc',
+          borderColor: PALETTE[1], borderWidth: 1, borderRadius: 5,
+        }],
+      },
+      options: _baseOpts({
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { maxRotation: 45, font: { size: 10 }, color: '#7a6872' } },
+          y: { beginAtZero: true, grid: { color: GRID_COLOR }, ticks: { color: '#7a6872' } },
+        },
+      }),
+    });
+  } catch (_) { _empty(canvas); }
+}
+
+async function loadChartPuntuacion() {
+  _destroyChart('puntuacion');
+  const canvas = document.getElementById('chart-puntuacion');
+  try {
+    const rows = await (await fetch('/api/graficas/puntuacion')).json();
+    if (rows.error || !rows.length) { _empty(canvas); return; }
+    S.charts.puntuacion = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.puntuacion),
+        datasets: [{
+          label: 'Cantidad de reseñas',
+          data: rows.map(r => r.total),
+          backgroundColor: PALETTE[0] + 'cc',
+          borderColor: PALETTE[0], borderWidth: 1, borderRadius: 4,
+        }],
+      },
+      options: _baseOpts({
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#7a6872' } },
+          y: { beginAtZero: true, grid: { color: GRID_COLOR }, ticks: { color: '#7a6872' } },
+        },
+      }),
+    });
+  } catch (_) { _empty(canvas); }
+}
+
+async function loadChartBodegas() {
+  _destroyChart('bodegas');
+  const canvas = document.getElementById('chart-bodegas');
+  try {
+    const rows = await (await fetch('/api/graficas/bodegas')).json();
+    if (rows.error || !rows.length) { _empty(canvas); return; }
+    S.charts.bodegas = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.bodega),
+        datasets: [{
+          label: 'Puntuación promedio',
+          data: rows.map(r => r.puntuacion),
+          backgroundColor: PALETTE[2] + 'cc',
+          borderColor: PALETTE[2], borderWidth: 1, borderRadius: 5,
+        }],
+      },
+      options: _baseOpts({
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: false, min: 85, grid: { color: GRID_COLOR }, ticks: { color: '#7a6872' } },
+          y: { ticks: { font: { size: 11 }, color: '#7a6872' } },
+        },
+      }),
+    });
+  } catch (_) { _empty(canvas); }
+}
+
+function _empty(canvas) {
+  const wrap = canvas.parentElement;
+  canvas.style.display = 'none';
+  if (!wrap.querySelector('.chart-empty')) {
+    const div = document.createElement('div');
+    div.className = 'chart-empty';
+    div.textContent = 'Sin datos — ejecute el pipeline ETL';
+    wrap.appendChild(div);
+  }
+}
+
+async function loadAllCharts() {
+  ['chart-paises','chart-variedades','chart-puntuacion','chart-bodegas'].forEach(id => {
+    const c = document.getElementById(id);
+    c.style.display = '';
+    c.parentElement.querySelector('.chart-empty')?.remove();
+  });
+  await Promise.all([loadChartPaises(), loadChartVariedades(), loadChartPuntuacion(), loadChartBodegas()]);
+}
+
+function getFilters() {
+  const p = {};
+  const pais     = document.getElementById('f-pais').value;
+  const variedad = document.getElementById('f-variedad').value;
+  const bodega   = document.getElementById('f-bodega').value.trim();
+  const puntos   = document.getElementById('f-puntos').value;
+  const precio   = document.getElementById('f-precio').value;
+  if (pais)     p.pais       = pais;
+  if (variedad) p.variedad   = variedad;
+  if (bodega)   p.bodega     = bodega;
+  if (puntos)   p.puntos_min = puntos;
+  if (precio)   p.precio_max = precio;
+  return p;
+}
+
+async function loadTable() {
+  const params = new URLSearchParams({ page: S.page, per_page: S.perPage, ...getFilters() });
+  document.getElementById('table-info').textContent = 'Cargando...';
+  try {
+    const d = await (await fetch(`/api/resenas?${params}`)).json();
+    if (d.error) throw new Error(d.error);
+    S.totalPages = d.total_pages || 1;
+    renderTable(d.data);
+    renderPagination(d.total, d.page, d.per_page, d.total_pages);
+  } catch (err) {
+    document.getElementById('table-body').innerHTML =
+      `<tr><td class="td-empty" colspan="8">Error: ${err.message}</td></tr>`;
+    document.getElementById('table-info').textContent = 'Error al cargar datos';
+  }
+}
+
+function ptsClass(pts) {
+  return pts >= 95 ? 'badge-pts-hi' : 'badge-pts';
+}
+
+function renderTable(rows) {
+  const tbody = document.getElementById('table-body');
+  if (!rows?.length) {
+    tbody.innerHTML = '<tr><td class="td-empty" colspan="8">Sin registros — ejecute el pipeline ETL (CSV→E→T→L)</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="td-title" title="${(r.title ?? '').replace(/"/g,'&quot;')}">${r.title ?? '—'}</td>
+      <td>${r.variedad ?? '—'}</td>
+      <td>${r.pais ?? '—'}</td>
+      <td>${r.bodega ?? '—'}</td>
+      <td>${r.provincia ?? '—'}</td>
+      <td><span class="badge ${ptsClass(r.points)}">${r.points}</span></td>
+      <td class="td-price">${r.price > 0 ? fmtUSD(r.price) : '—'}</td>
+      <td class="mono">${r.catador ?? '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function renderPagination(total, page, perPage, totalPages) {
+  document.getElementById('table-info').innerHTML =
+    `<strong>${fmt(total)}</strong> reseñas encontradas`;
+  document.getElementById('page-info').textContent = `Página ${page} de ${totalPages}`;
+  document.getElementById('btn-prev').disabled = page <= 1;
+  document.getElementById('btn-next').disabled = page >= totalPages;
+}
+
+function changePage(dir) {
+  const next = S.page + dir;
+  if (next < 1 || next > S.totalPages) return;
+  S.page = next; loadTable();
+}
+function changePerPage() {
+  S.perPage = parseInt(document.getElementById('per-page').value);
+  S.page = 1; loadTable();
+}
+function applyFilters() { S.page = 1; loadTable(); }
+function clearFilters() {
+  ['f-pais','f-variedad'].forEach(id => document.getElementById(id).value = '');
+  ['f-bodega','f-puntos','f-precio'].forEach(id => document.getElementById(id).value = '');
+  S.page = 1; loadTable();
+}
+
+async function loadFilterOptions() {
+  try {
+    const d = await (await fetch('/api/resenas?per_page=200')).json();
+    if (!d.data?.length) return;
+    const unique = key => [...new Set(d.data.map(r => r[key]))].filter(Boolean).sort();
+    populateSelect('f-pais',     unique('pais'));
+    populateSelect('f-variedad', unique('variedad'));
+  } catch (_) {}
+}
+
+function populateSelect(id, values) {
+  const sel = document.getElementById(id);
+  const current = sel.value;
+  const first = sel.options[0];
+  sel.innerHTML = '';
+  sel.appendChild(first);
+  values.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = v;
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
+}
+
+let _modalResolve = null;
+
+function openModal({ icon = '❓', title = '', body = '', note = '', btnLabel = 'Confirmar', btnClass = 'btn-gold' } = {}) {
+  document.getElementById('modal-icon').textContent          = icon;
+  document.getElementById('modal-title').textContent         = title;
+  document.getElementById('modal-body').innerHTML            = body;
+  document.getElementById('modal-note').innerHTML            = note;
+  const cb = document.getElementById('modal-confirm-btn');
+  cb.textContent = btnLabel;
+  cb.className   = `btn ${btnClass}`;
+  document.getElementById('modal-note').style.display = note ? '' : 'none';
+  document.getElementById('modal-backdrop').classList.add('show');
+  return new Promise(res => { _modalResolve = res; });
+}
+
+function closeModal(confirmed) {
+  document.getElementById('modal-backdrop').classList.remove('show');
+  if (_modalResolve) { _modalResolve(confirmed); _modalResolve = null; }
+}
+
+document.getElementById('modal-backdrop').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal(false);
+});
+
+async function generarAleatorio() {
+  if (S.busy) { showToast('Hay una operación en curso', 'info'); return; }
+  const confirmed = await openModal({
+    icon: '🎲',
+    title: 'Generar Reseñas Aleatorias',
+    body: 'Se generarán <strong>100,000 reseñas</strong> con datos aleatorios e insertarán directamente en <strong>StarRocks</strong>.',
+    note: '⚠ Requiere que las dimensiones ya existan<br>(haber ejecutado <strong>E → T → L</strong> al menos una vez)',
+    btnLabel: '🎲 Generar',
+    btnClass: 'btn-gold',
+  });
+  if (!confirmed) return;
+  const id  = 'btn-generar';
+  const btn = document.getElementById(id);
+  S.busy = true; setBusy(id, true);
+  btn.innerHTML = '<span class="spinner on" id="sp-generar"></span> Generando...';
+  addLog('▶ Generando 100,000 reseñas aleatorias → StarRocks ...');
+  try {
+    const resp = await fetch('/etl/generar-aleatorio', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ n: 100000 }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+    addLog(`✓ Generación completada: ${fmt(data.insertados)} filas insertadas\n${(data.log || '').trim()}`);
+    showToast(`${fmt(data.insertados)} reseñas aleatorias insertadas`, 'success');
+    await checkEtlStatus();
+    await reloadDashboard();
+  } catch (err) {
+    addLog(`✗ Error: ${err.message}`);
+    showToast(`Error: ${err.message}`, 'error');
+  } finally {
+    S.busy = false; setBusy(id, false);
+  }
+}
+
+async function reloadDashboard() {
+  S.page = 1;
+  await Promise.all([loadKPIs(), loadAllCharts(), loadTable()]);
+}
+
+document.getElementById('f-bodega')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') applyFilters();
+});
+['f-puntos','f-precio'].forEach(id => {
+  document.getElementById(id)?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') applyFilters();
+  });
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+  checkEtlStatus();
+  startPolling();
+  await Promise.all([loadKPIs(), loadAllCharts(), loadTable()]);
+  loadFilterOptions();
+});
+</script>
+</body>
+</html>

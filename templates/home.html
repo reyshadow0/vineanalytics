@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VinAnalytics Group — Descubre el vino perfecto</title>
+  <style>
+    :root {
+      --wine:#8B1A1A; --wine-dark:#5C0E0E; --gold:#C9A84C;
+      --text:#1a1a1a; --muted:#777; --border:#e0d5c5; --bg:#FAF7F2;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',Arial,sans-serif; color:var(--text); background:#fff; }
+    a { text-decoration:none; color:inherit; }
+
+    /* ── HEADER ── */
+    .header {
+      position:absolute; top:0; left:0; right:0; z-index:100; padding:18px 0;
+      background:linear-gradient(to bottom,rgba(0,0,0,.65),transparent);
+    }
+    .header-inner { max-width:1200px; margin:0 auto; padding:0 28px; display:flex; align-items:center; gap:24px; }
+    .logo { font-size:22px; font-weight:900; color:#fff; letter-spacing:-.5px; min-width:170px; }
+    .logo em { color:var(--gold); font-style:normal; }
+    .header-actions { margin-left:auto; display:flex; gap:10px; align-items:center; }
+    .hbtn { color:rgba(255,255,255,.85); font-size:13px; padding:8px 16px; border-radius:4px; border:1px solid rgba(255,255,255,.3); font-weight:600; transition:all .15s; }
+    .hbtn:hover { background:rgba(255,255,255,.15); color:#fff; }
+    .hbtn.wine  { background:var(--wine); color:#fff; border-color:var(--wine); }
+    .hbtn.wine:hover { background:var(--wine-dark); }
+    .hbtn.green { background:#3a7a20; color:#fff; border-color:#3a7a20; }
+    .hbtn.green:hover { background:#2e6018; }
+    .user-chip { color:rgba(255,255,255,.7); font-size:13px; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height:100vh; position:relative; overflow:hidden;
+      background:linear-gradient(160deg,#0a0101 0%,#2a0808 50%,#0a0101 100%);
+      display:flex; align-items:center;
+    }
+    .hero-bg {
+      position:absolute; inset:0;
+      background-image:url('https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&w=1600&q=60');
+      background-size:cover; background-position:center right;
+      opacity:0.12; filter:saturate(0.5);
+    }
+    .hero-inner { max-width:900px; margin:0 auto; padding:180px 28px 110px; display:flex; flex-direction:column; align-items:center; text-align:center; width:100%; position:relative; }
+    .hero-left { display:flex; flex-direction:column; align-items:center; width:100%; }
+    .hero-eyebrow { font-size:11px; font-weight:800; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:20px; }
+    .hero-title { font-size:clamp(40px,6vw,72px); font-weight:900; color:#fff; line-height:1.06; margin-bottom:16px; text-align:center; }
+    .hero-title em { color:var(--gold); font-style:normal; }
+    .hero-subtitle { font-size:17px; color:rgba(255,255,255,.62); max-width:560px; line-height:1.75; margin-bottom:38px; text-align:center; }
+    .hero-search { width:100%; max-width:620px; position:relative; margin-bottom:18px; }
+    .hero-search input { width:100%; padding:18px 64px 18px 24px; border:none; border-radius:50px; font-size:16px; outline:none; background:#fff; box-shadow:0 8px 48px rgba(0,0,0,.5); color:var(--text); }
+    .hero-search input::placeholder { color:#aaa; }
+    .hero-search button { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:var(--wine); color:#fff; border:none; width:46px; height:46px; border-radius:50%; font-size:18px; cursor:pointer; transition:background .2s; }
+    .hero-search button:hover { background:var(--wine-dark); }
+    .hero-hints { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:52px; justify-content:center; }
+    .hint { background:rgba(255,255,255,.1); color:rgba(255,255,255,.75); border:1px solid rgba(255,255,255,.18); border-radius:20px; padding:5px 14px; font-size:12px; cursor:pointer; transition:background .15s; }
+    .hint:hover { background:rgba(255,255,255,.2); color:#fff; }
+    .hero-stats { display:flex; gap:48px; justify-content:center; }
+    .hstat { text-align:center; }
+    .hstat strong { display:block; font-size:28px; font-weight:900; color:#fff; }
+    .hstat span   { font-size:10px; color:rgba(255,255,255,.45); text-transform:uppercase; letter-spacing:.8px; }
+
+    /* Scroll indicator */
+    .scroll-down { position:absolute; bottom:30px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,.35); font-size:12px; display:flex; flex-direction:column; align-items:center; gap:5px; animation:sd 2s infinite; }
+    @keyframes sd { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(7px)} }
+
+    /* ── SECTIONS ── */
+    .section { padding:64px 0; }
+    .section.gray { background:#f8f4ef; }
+    .section-inner { max-width:1200px; margin:0 auto; padding:0 28px; }
+    .section-head { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:32px; }
+    .section-head h2 { font-size:26px; font-weight:900; color:var(--wine-dark); }
+    .section-head p  { font-size:14px; color:var(--muted); margin-top:4px; }
+    .section-head a  { font-size:13px; color:var(--wine); font-weight:700; flex-shrink:0; }
+
+    /* ── WINE CARDS ── */
+    .cards-row { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+    .wine-card { background:#fff; border:1.5px solid var(--border); border-radius:12px; overflow:hidden; transition:all .25s; cursor:pointer; position:relative; }
+    .wine-card:hover { box-shadow:0 12px 40px rgba(139,26,26,.18); transform:translateY(-5px); border-color:var(--wine); }
+    .card-img-wrap {
+      width:100%; height:200px; overflow:hidden;
+      background:linear-gradient(160deg,#1a0505,#2d0a0a);
+      display:flex; align-items:center; justify-content:center; position:relative;
+    }
+    .card-img-wrap img {
+      width:100%; height:100%; object-fit:cover;
+      transition:transform .4s ease;
+      filter:brightness(0.9) saturate(1.1);
+    }
+    .wine-card:hover .card-img-wrap img { transform:scale(1.07); }
+    .card-img-fallback {
+      width:100%; height:100%;
+      background:linear-gradient(160deg,var(--fallback-top,#3a0a0a),var(--fallback-bot,#1a0505));
+      display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;
+    }
+    .card-img-overlay {
+      position:absolute; bottom:0; left:0; right:0; height:70px;
+      background:linear-gradient(to top,rgba(0,0,0,.7),transparent);
+    }
+    .card-score-band { height:4px; flex-shrink:0; }
+    .band-95{background:#1a7a1a} .band-90{background:#4a8a2a} .band-85{background:#8a9a2a} .band-80{background:#c9a04c}
+    .card-body { padding:16px 16px 14px; }
+    .card-flag  { font-size:18px; margin-bottom:5px; }
+    .card-name  { font-size:13px; font-weight:700; line-height:1.4; margin-bottom:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:36px; }
+    .card-bodega{ font-size:11px; color:var(--muted); margin-bottom:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .card-footer{ display:flex; align-items:center; justify-content:space-between; }
+    .card-pts   { display:inline-flex; align-items:center; gap:4px; background:var(--wine); color:#fff; font-size:11px; font-weight:900; padding:3px 10px; border-radius:20px; }
+    .card-price { font-size:16px; font-weight:900; color:var(--wine-dark); }
+    .card-var   { font-size:10px; color:var(--muted); margin-top:5px; }
+    .card-top-badge { position:absolute; top:10px; left:10px; background:var(--gold); color:var(--wine-dark); font-size:9px; font-weight:800; padding:3px 9px; border-radius:3px; letter-spacing:.8px; text-transform:uppercase; z-index:2; }
+
+    /* ── CATEGORIES (photo cards) ── */
+    .cats { display:grid; grid-template-columns:repeat(6,1fr); gap:14px; }
+    .cat {
+      border-radius:12px; overflow:hidden; position:relative; height:160px;
+      cursor:pointer; transition:transform .2s, box-shadow .2s;
+      background:#1a0808; background-size:cover; background-position:center;
+      display:block;
+    }
+    .cat:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(0,0,0,.3); }
+    .cat-overlay {
+      position:absolute; inset:0;
+      background:linear-gradient(to top,rgba(0,0,0,.78) 0%,rgba(0,0,0,.2) 55%,transparent 100%);
+    }
+    .cat-content { position:absolute; bottom:0; left:0; right:0; padding:14px 12px; }
+    .cat-name  { display:block; color:#fff; font-size:13px; font-weight:800; line-height:1.3; }
+    .cat-n     { display:block; color:rgba(255,255,255,.6); font-size:10px; margin-top:3px; }
+    .cat-ico   { position:absolute; top:10px; right:10px; font-size:20px; opacity:.85; }
+
+    /* ── WHY ── */
+    .why-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:32px; }
+    .why-card { text-align:center; padding:8px; }
+    .why-ico  { font-size:40px; margin-bottom:14px; display:block; }
+    .why-card h3 { font-size:17px; font-weight:800; color:var(--wine-dark); margin-bottom:8px; }
+    .why-card p  { font-size:14px; color:var(--muted); line-height:1.7; }
+
+    /* ── SKELETON ── */
+    .sk { background:linear-gradient(90deg,#f0e8e0 25%,#e8ddd4 50%,#f0e8e0 75%); background-size:200% 100%; animation:sh 1.3s infinite; border-radius:12px; }
+    @keyframes sh { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    /* ── SCROLL REVEAL ── */
+    .reveal { opacity:0; transform:translateY(36px); transition:opacity .7s ease,transform .7s ease; }
+    .reveal.visible { opacity:1; transform:translateY(0); }
+
+    /* ── FOOTER ── */
+    .footer { background:#0e0404; color:#888; padding:56px 0 24px; }
+    .footer-inner { max-width:1200px; margin:0 auto; padding:0 28px; }
+    .footer-grid { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:40px; padding-bottom:32px; border-bottom:1px solid #1e0a0a; margin-bottom:24px; }
+    .footer-logo { font-size:20px; font-weight:900; color:#fff; margin-bottom:10px; }
+    .footer-logo em { color:var(--gold); font-style:normal; }
+    .footer p  { font-size:13px; line-height:1.7; }
+    .footer h4 { color:#ccc; font-size:11px; font-weight:700; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; }
+    .footer ul { list-style:none; }
+    .footer ul li { margin-bottom:8px; }
+    .footer ul li a { color:#666; font-size:13px; transition:color .15s; }
+    .footer ul li a:hover { color:var(--gold); }
+    .footer-bottom { display:flex; justify-content:space-between; font-size:12px; color:#333; }
+
+    @media(max-width:960px){
+      .cards-row { grid-template-columns:repeat(2,1fr); }
+      .cats { grid-template-columns:repeat(3,1fr); }
+      .why-grid { grid-template-columns:1fr; }
+      .footer-grid { grid-template-columns:1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-inner">
+    <a href="/" class="logo">🍷 Vin<em>Analytics</em></a>
+    <div class="header-actions">
+      {% if session.username %}
+        <span class="user-chip">👤 {{ session.username }}</span>
+        <a href="/logout" class="hbtn">Salir</a>
+        {% if session.rol == 'admin' %}
+          <a href="/admin"     class="hbtn wine">⚙️ Administración</a>
+        {% else %}
+          <a href="/dashboard" class="hbtn green">📊 Dashboard</a>
+        {% endif %}
+      {% else %}
+        <a href="/login" class="hbtn">Iniciar sesión</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-inner">
+    <div class="hero-left">
+      <div class="hero-eyebrow">Plataforma de Inteligencia Vitivinícola · 44 países</div>
+      <h1 class="hero-title">Descubre el vino<br>que <em>te mereces.</em></h1>
+      <p class="hero-subtitle">Más de 308,000 reseñas de vinos de todo el mundo. Filtra por país, variedad, bodega, puntuación y precio — todo en tiempo real.</p>
+      <div class="hero-search">
+        <input type="text" id="hero-search" placeholder="Buscar vino, bodega o variedad...">
+        <button onclick="doSearch()">🔍</button>
+      </div>
+      <div class="hero-hints">
+        <span class="hint" onclick="searchHint('Pinot Noir')">Pinot Noir</span>
+        <span class="hint" onclick="searchHint('Chardonnay')">Chardonnay</span>
+        <span class="hint" onclick="searchHint('Cabernet')">Cabernet</span>
+        <span class="hint" onclick="searchHint('Italy')">Italia</span>
+        <span class="hint" onclick="searchHint('France')">Francia</span>
+        <span class="hint" onclick="searchHint('Argentina')">Argentina</span>
+      </div>
+      <div class="hero-stats">
+        <div class="hstat"><strong>308,724</strong><span>Reseñas</span></div>
+        <div class="hstat"><strong>44</strong><span>Países</span></div>
+        <div class="hstat"><strong>708</strong><span>Variedades</span></div>
+        <div class="hstat"><strong>16,756</strong><span>Bodegas</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="scroll-down"><span>Explorar</span><span style="font-size:18px">↓</span></div>
+</section>
+
+<!-- TOP WINES -->
+<section class="section reveal">
+  <div class="section-inner">
+    <div class="section-head">
+      <div><h2>Vinos Mejor Puntuados</h2><p>Los más valorados de nuestra base de datos global</p></div>
+      <a href="/vinos">Ver todos los vinos →</a>
+    </div>
+    <div class="cards-row" id="top-cards">
+      {% for i in range(4) %}<div style="height:340px;" class="sk"></div>{% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- CATEGORIES -->
+<section class="section gray reveal">
+  <div class="section-inner">
+    <div class="section-head">
+      <div><h2>Explorar por Categoría</h2><p>Encuentra el vino perfecto entre 708 variedades catalogadas</p></div>
+      <a href="/vinos">Ver catálogo completo →</a>
+    </div>
+    <div class="cats">
+      <a href="/vinos" class="cat"
+         style="background-image:url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&w=400&q=75')">
+        <div class="cat-overlay"></div>
+        <span class="cat-ico">🍷</span>
+        <div class="cat-content"><span class="cat-name">Tintos</span><span class="cat-n">Cabernet, Merlot, Pinot…</span></div>
+      </a>
+      <a href="/vinos" class="cat"
+         style="background-image:url('https://images.unsplash.com/photo-1516594915697-87eb3b1c14ea?auto=format&w=400&q=75')">
+        <div class="cat-overlay"></div>
+        <span class="cat-ico">🥂</span>
+        <div class="cat-content"><span class="cat-name">Blancos</span><span class="cat-n">Chardonnay, Riesling…</span></div>
+      </a>
+      <a href="/vinos" class="cat"
+         style="background-image:url('https://images.unsplash.com/photo-1560148218-1a83060f7b32?auto=format&w=400&q=75')">
+        <div class="cat-overlay"></div>
+        <span class="cat-ico">🌸</span>
+        <div class="cat-content"><span class="cat-name">Rosados</span><span class="cat-n">Provence, Tempranillo…</span></div>
+      </a>
+      <a href="/vinos" class="cat"
+         style="background-image:url('https://images.unsplash.com/photo-1504279577054-9cd55ddcf1f4?auto=format&w=400&q=75')">
+        <div class="cat-overlay"></div>
+        <span class="cat-ico">🍾</span>
+        <div class="cat-content"><span class="cat-name">Espumosos</span><span class="cat-n">Champagne, Cava, Prosecco</span></div>
+      </a>
+      <a href="/vinos" class="cat"
+         style="background-image:url('https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?auto=format&w=400&q=75')">
+        <div class="cat-overlay"></div>
+        <span class="cat-ico">⭐</span>
+        <div class="cat-content"><span class="cat-name">Top 95–100 pts</span><span class="cat-n">Puntuación perfecta</span></div>
+      </a>
+      <a href="/vinos" class="cat"
+         style="background-image:url('https://images.unsplash.com/photo-1543158266-0066955047b0?auto=format&w=400&q=75')">
+        <div class="cat-overlay"></div>
+        <span class="cat-ico">🗺️</span>
+        <div class="cat-content"><span class="cat-name">Por País</span><span class="cat-n">44 países disponibles</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section class="section reveal">
+  <div class="section-inner">
+    <div class="section-head" style="display:block;text-align:center;margin-bottom:40px;">
+      <h2>¿Por qué VinAnalytics?</h2>
+      <p style="margin-top:6px;">Datos reales, análisis en tiempo real, inteligencia al servicio del vino.</p>
+    </div>
+    <div class="why-grid">
+      <div class="why-card"><span class="why-ico">🔬</span><h3>Datos Verificados</h3><p>308,724 reseñas de catadores profesionales en un modelo estrella StarRocks OLAP para análisis instantáneo.</p></div>
+      <div class="why-card"><span class="why-ico">🌍</span><h3>Cobertura Global</h3><p>Vinos de 44 países, 708 variedades y 16,756 bodegas. Desde Napa Valley hasta Mendoza, Burdeos o Rioja.</p></div>
+      <div class="why-card"><span class="why-ico">⚡</span><h3>Tiempo Real</h3><p>Filtros instantáneos sobre 300,000+ registros. Motor analítico OLAP que responde en milisegundos.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- RECENT -->
+<section class="section gray reveal">
+  <div class="section-inner">
+    <div class="section-head">
+      <div><h2>Reseñas Recientes</h2><p>Los últimos vinos añadidos a la base de datos</p></div>
+      <a href="/vinos">Ver más →</a>
+    </div>
+    <div class="cards-row" id="recent-cards">
+      {% for i in range(4) %}<div style="height:340px;" class="sk"></div>{% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-logo">🍷 Vin<em>Analytics</em> Group</div>
+        <p>Base de datos con más de 308,000 reseñas de vinos de 44 países. Inteligencia vitivinícola en tiempo real.</p>
+      </div>
+      <div>
+        <h4>Explorar</h4>
+        <ul>
+          <li><a href="/vinos">Todos los Vinos</a></li>
+          <li><a href="/vinos">Tintos</a></li>
+          <li><a href="/vinos">Blancos</a></li>
+          <li><a href="/vinos">Top 95–100 pts</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Por País</h4>
+        <ul>
+          <li><a href="/vinos">🇮🇹 Italia</a></li>
+          <li><a href="/vinos">🇫🇷 Francia</a></li>
+          <li><a href="/vinos">🇪🇸 España</a></li>
+          <li><a href="/vinos">🇦🇷 Argentina</a></li>
+          <li><a href="/vinos">🇺🇸 Estados Unidos</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Sistema</h4>
+        <ul>
+          <li><a href="/login">Iniciar Sesión</a></li>
+          {% if session.username %}<li><a href="/dashboard">Dashboard</a></li>{% endif %}
+          {% if session.rol == 'admin' %}<li><a href="/admin">Administración</a></li>{% endif %}
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2024 VinAnalytics Group</span>
+      <span>Flask · StarRocks · PocketBase · Docker</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════
+   DATA LOADING
+═══════════════════════════════════════════════ */
+const FLAGS = {'US':'🇺🇸','Italy':'🇮🇹','France':'🇫🇷','Spain':'🇪🇸','Portugal':'🇵🇹','Argentina':'🇦🇷','Chile':'🇨🇱','Australia':'🇦🇺','Austria':'🇦🇹','Germany':'🇩🇪','New Zealand':'🇳🇿','South Africa':'🇿🇦','Greece':'🇬🇷','Hungary':'🇭🇺'};
+
+/* Real wine photos rotating by card index */
+const WINE_PHOTOS = [
+  'https://images.unsplash.com/photo-1568213816046-0ee1c42bd559?auto=format&w=600&q=80',
+  'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&w=600&q=80',
+  'https://images.unsplash.com/photo-1474722883778-792e7990302f?auto=format&w=600&q=80',
+  'https://images.unsplash.com/photo-1547595628-c61a29f496f0?auto=format&w=600&q=80',
+  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&w=600&q=80',
+  'https://images.unsplash.com/photo-1504279577054-9cd55ddcf1f4?auto=format&w=600&q=80',
+  'https://images.unsplash.com/photo-1516594915697-87eb3b1c14ea?auto=format&w=600&q=80',
+  'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?auto=format&w=600&q=80',
+];
+
+const FALLBACK_GRADS = [
+  'linear-gradient(160deg,#5a0a0a,#2a0505)',
+  'linear-gradient(160deg,#1a3a10,#0a1a05)',
+  'linear-gradient(160deg,#4a1028,#2a0814)',
+  'linear-gradient(160deg,#1a1a40,#0a0a1e)',
+  'linear-gradient(160deg,#3a2a0a,#1e1205)',
+  'linear-gradient(160deg,#0a2a2a,#05101a)',
+];
+
+function bandClass(p){ return p>=95?'band-95':p>=90?'band-90':p>=85?'band-85':'band-80'; }
+
+function buildCard(w, i, badge) {
+  const f  = FLAGS[w.pais] || '🌍';
+  const pr = w.price > 0 ? `$${parseFloat(w.price).toFixed(0)}` : 'N/D';
+  const img = WINE_PHOTOS[i % WINE_PHOTOS.length];
+  const fallback = FALLBACK_GRADS[i % FALLBACK_GRADS.length];
+  return `<div class="wine-card">
+    ${badge ? `<span class="card-top-badge">${badge}</span>` : ''}
+    <div class="card-img-wrap">
+      <img src="${img}" alt="${(w.title||'').replace(/"/g,'&quot;')}" loading="lazy"
+           onerror="this.parentElement.style.background='${fallback}';this.remove()">
+      <div class="card-img-overlay"></div>
+    </div>
+    <div class="card-score-band ${bandClass(w.points)}"></div>
+    <div class="card-body">
+      <div class="card-flag">${f}</div>
+      <div class="card-name">${w.title||'Sin título'}</div>
+      <div class="card-bodega">${w.bodega||''}</div>
+      <div class="card-footer">
+        <span class="card-pts">★ ${w.points} pts</span>
+        <span class="card-price">${pr}</span>
+      </div>
+      <div class="card-var">${w.variedad||''}</div>
+    </div>
+  </div>`;
+}
+
+const empty = `<div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:40px;text-align:center;color:#aaa;font-size:13px;">Sin datos.<br><a href="/admin" style="color:var(--wine);">Cargar datos →</a></div>`;
+
+async function loadCards(id, url, badge) {
+  const el = document.getElementById(id);
+  try {
+    const r = await fetch(url), d = await r.json();
+    if (!d.data || !d.data.length) { el.innerHTML = Array(4).fill(empty).join(''); return; }
+    el.innerHTML = d.data.map((w, i) => buildCard(w, i, badge)).join('');
+  } catch { el.innerHTML = Array(4).fill(empty).join(''); }
+}
+
+function doSearch() { const q = document.getElementById('hero-search').value.trim(); if (q) window.location.href = `/vinos?q=${encodeURIComponent(q)}`; }
+function searchHint(q) { document.getElementById('hero-search').value = q; doSearch(); }
+document.getElementById('hero-search').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+loadCards('top-cards',    '/api/resenas?per_page=4&puntos_min=95', 'Top Rated');
+loadCards('recent-cards', '/api/resenas?per_page=4&puntos_min=88', null);
+
+/* ═══════════════════════════════════════════════
+   INTERSECTION OBSERVERS
+═══════════════════════════════════════════════ */
+const revObs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); revObs.unobserve(e.target); } });
+}, { threshold: 0.08 });
+document.querySelectorAll('.reveal').forEach(el => revObs.observe(el));
+
+const cardObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('.wine-card,.cat,.why-card').forEach((c, i) => {
+        setTimeout(() => { c.style.opacity = '1'; c.style.transform = 'translateY(0)'; }, i * 90);
+      });
+      cardObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.05 });
+document.querySelectorAll('.cards-row,.cats,.why-grid').forEach(el => {
+  el.querySelectorAll('.wine-card,.cat,.why-card').forEach(c => {
+    c.style.opacity = '0'; c.style.transform = 'translateY(28px)';
+    c.style.transition = 'opacity .5s ease,transform .5s ease';
+  });
+  cardObs.observe(el);
+});
+</script>
+</body>
+</html>

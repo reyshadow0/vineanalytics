@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Respaldos — VinAnalytics Group</title>
+  <style>
+    /* ── BASE & VARIABLES ── */
+    :root {
+      color-scheme: dark;
+      --bg:        #060305;
+      --surface:   rgba(255,255,255,0.035);
+      --surface2:  rgba(255,255,255,0.06);
+      --border:    rgba(155,31,66,0.2);
+      --border-s:  rgba(255,255,255,0.06);
+      --accent:    #9b1f42;
+      --accent2:   #d97a98;
+      --gold:      #c9933a;
+      --text:      #f5eef0;
+      --muted:     #7a6872;
+      --radius:    16px;
+      --green:     #22a35f;
+      --red:       #ef4444;
+      --blue:      #60a5fa;
+      --orange:    #c9933a;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+      background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;
+    }
+    body::before{
+      content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse 70% 40% at 5% 0%,rgba(155,31,66,.12) 0%,transparent 60%),
+        radial-gradient(ellipse 50% 50% at 95% 100%,rgba(201,147,58,.07) 0%,transparent 60%);
+    }
+
+    /* ── SIDEBAR & LAYOUT ── */
+    .app-container { display: flex; min-height: 100vh; position:relative; z-index:1; }
+    .sidebar {
+      width: 240px; background: rgba(10,5,8,.95);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0;
+      position: sticky; top: 0; height: 100vh;
+      backdrop-filter: blur(20px);
+    }
+    .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); text-align: center; }
+    .logo{
+      font-size:1.05rem;font-weight:800;letter-spacing:.02em;color:var(--text);
+      text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    .logo span{color:var(--gold)}
+    .sidebar-nav { flex: 1; padding: 16px 0; display: flex; flex-direction: column; gap: 3px; }
+    .nav-item {
+      padding: 11px 18px; color: var(--text); text-decoration: none;
+      display: flex; align-items: center; gap: 10px; font-weight: 500;
+      transition: background .2s; border-right: 3px solid transparent; font-size:.9rem;
+    }
+    .nav-item:hover { background: rgba(155,31,66,.1); }
+    .nav-item.active { background: rgba(155,31,66,.15); color: var(--accent2); border-right-color: var(--accent2); }
+    .sidebar-footer { padding: 18px; border-top: 1px solid var(--border); }
+    .user-info { margin-bottom: 12px; font-size: .88rem; color: var(--text); text-align: center; }
+    .user-role { font-size: .72rem; color: var(--accent2); font-weight: 700; margin-top: 4px; text-transform:uppercase; letter-spacing:.06em; }
+    .content-wrapper { flex: 1; display: flex; flex-direction: column; overflow-x: hidden; }
+    .main{max-width:1440px;width:100%;margin:0 auto;padding:22px 26px}
+
+    /* ── BUTTONS ── */
+    .btn{
+      padding:8px 18px;border:none;border-radius:10px;font-size:.88rem;font-weight:600;
+      cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;
+      gap:6px;justify-content:center;text-decoration:none;
+    }
+    .btn-primary{background:linear-gradient(135deg,var(--accent),#6e1430);color:#fff}
+    .btn-primary:hover:not(:disabled){filter:brightness(1.15);transform:translateY(-1px)}
+    .btn-secondary{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--border-s)}
+    .btn-secondary:hover:not(:disabled){background:rgba(255,255,255,.08)}
+    .btn-danger{background:var(--red);color:#fff}
+    .btn-danger:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px)}
+    .btn-warning{background:linear-gradient(135deg,var(--gold),#a0722a);color:#fff}
+    .btn-warning:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px)}
+
+    /* ── FORMS & CARDS ── */
+    .card{
+      background:var(--surface);border-radius:var(--radius);padding:22px;
+      margin-bottom:20px;border:1px solid var(--border-s);backdrop-filter:blur(8px);
+    }
+    .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+    .card-title{font-size:.95rem;font-weight:700;color:var(--accent2);margin:0;}
+    .card-desc{color:var(--muted);font-size:.88rem;margin-bottom:16px;}
+
+    /* ── ALERTS ── */
+    .alerts { margin-bottom: 20px; }
+    .alert { padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; font-weight: 500; }
+    .alert.success { background: rgba(34,163,95,.12); color: #4ade80; border: 1px solid rgba(34,163,95,.25); }
+    .alert.error { background: rgba(239,68,68,.12); color: #fca5a5; border: 1px solid rgba(239,68,68,.25); }
+    .alert.info { background: rgba(201,147,58,.12); color: #fcd34d; border: 1px solid rgba(201,147,58,.25); }
+
+    /* ── TABLE ── */
+    .tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border-s)}
+    table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:.84rem}
+    thead tr{background:rgba(0,0,0,.25)}
+    th{
+      padding:11px 13px;text-align:left;font-weight:700;color:var(--gold);
+      border-bottom:1px solid var(--border-s);
+      font-size:.69rem;text-transform:uppercase;letter-spacing:.06em;
+    }
+    td{padding:11px 13px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--text);vertical-align:middle;}
+    tr:last-child td{border-bottom:none}
+    tbody tr:hover{background:rgba(155,31,66,.06)}
+    .badge{padding:3px 9px;border-radius:99px;font-weight:700;font-size:.7rem;}
+    .badge-diario{background:rgba(34,163,95,.15);color:#4ade80;}
+    .badge-semanal{background:rgba(96,165,250,.15);color:#93c5fd;}
+    .badge-mensual{background:rgba(217,122,152,.15);color:var(--accent2);}
+    .badge-manual{background:rgba(201,147,58,.15);color:var(--gold);}
+
+    /* ── ACTIONS ── */
+    .actions { display: flex; gap: 8px; align-items: center; }
+    .inline-form { display: inline; margin: 0; }
+
+    .spin{display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent2);border-radius:50%;animation:spin .7s linear infinite}
+    .spin.on{display:inline-block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .msg{display:none;padding:10px 14px;border-radius:10px;font-size:.85rem;font-weight:500}
+    .msg.on{display:block}
+    .msg.ok{background:rgba(34,163,95,.12);color:#4ade80;border:1px solid rgba(34,163,95,.25)}
+    .msg.err{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.25)}
+
+    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .status-online { background-color: var(--green); box-shadow: 0 0 8px var(--green); }
+    .status-offline { background-color: var(--red); box-shadow: 0 0 8px var(--red); animation: blink 1s infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,.7); align-items: center; justify-content: center; backdrop-filter:blur(4px); }
+    .modal.show { display: flex; }
+    .modal-content { background: #0d0208; padding: 26px; border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 400px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+    .modal-title { font-size: 1.1rem; font-weight: 700; color: var(--accent2); }
+    .close { color: var(--muted); font-size: 1.5rem; font-weight: bold; cursor: pointer; background: none; border: none; }
+    .close:hover { color: var(--text); }
+    .fg select { padding: 10px 12px; background: rgba(255,255,255,.04); border: 1px solid var(--border-s); border-radius: 10px; color: var(--text); width: 100%; margin-bottom: 20px; }
+
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(155,31,66,.35);border-radius:3px}
+
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="/" class="logo">🍷 <span>Vin</span>Analytics Group</a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-item">📊 Dashboard</a>
+      {% if session.get('rol') == 'admin' %}
+      <a href="/auditoria" class="nav-item">📋 Auditoría</a>
+      <a href="/usuarios" class="nav-item">👤 Usuarios</a>
+      <a href="/respaldos" class="nav-item active">💾 Respaldos</a>
+      {% endif %}
+      <a href="/reportes" class="nav-item">📄 Reportes</a>
+      <a href="/configuracion" class="nav-item">⚙️ Configuración</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div style="font-weight:bold;">{{ session['username'] }}</div>
+        <div class="user-role">{{ session['rol'] | upper }}</div>
+      </div>
+      <a href="/logout" class="btn" style="background: #ef4444; color: white; width: 100%;">🚪 Cerrar Sesión</a>
+    </div>
+  </aside>
+
+  <div class="content-wrapper">
+    <div class="main">
+      
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+        <h1 style="font-size:1.5rem; margin:0;">Gestión de Respaldos</h1>
+        <div style="background: var(--surface); padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); display:flex; align-items:center; font-weight:bold;">
+            <span class="status-dot {{ 'status-online' if db_status == 'online' else 'status-offline' }}" id="dbStatusDot"></span>
+            <span id="dbStatusText">{{ 'Base de Datos Conectada' if db_status == 'online' else 'Base de Datos Caída' }}</span>
+        </div>
+      </div>
+    
+
+      <!-- ALERTS -->
+      <div class="alerts">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert {{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+      </div>
+
+      
+      <!-- RECOVERY HISTORY -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">🛠️ Historial de Recuperaciones Automáticas</h2>
+            <div class="card-desc">El monitor verifica la conexión cada 30 segundos. Si falla 3 veces, activa el modo de recuperación automática usando el último respaldo.</div>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha y Hora</th>
+                <th>Respaldo Utilizado</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rec in history %}
+              <tr>
+                <td>{{ rec.date }}</td>
+                <td style="font-family: monospace;">{{ rec.backup_used }}</td>
+                <td>
+                  <span class="badge {{ 'badge-diario' if rec.status == 'Exitoso' else 'badge-manual' }}">{{ rec.status }}</span>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" style="text-align: center; padding: 20px; color: var(--muted);">No hay recuperaciones automáticas registradas.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">💾 Historial de Respaldos</h2>
+            <div class="card-desc">Los respaldos se almacenan localmente en <code>C:/retailytics_backups/</code>. Los respaldos programados se ejecutan automáticamente mediante APScheduler.</div>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="btnLoad" class="btn btn-primary" onclick="loadDataset()">⬆ Cargar Dataset</button>
+            <span class="spin" id="loadSpin"></span>
+            <button class="btn btn-warning" onclick="openRestoreModal()">🔄 Restaurar Manualmente</button>
+            <form method="POST" action="/respaldos/crear">
+              <button type="submit" class="btn btn-primary">➕ Crear Respaldo Ahora</button>
+            </form>
+          </div>
+        </div>
+        <div id="loadMsg" class="msg" style="margin-bottom:20px; display:none; padding: 10px; border-radius: 6px;"></div>
+        
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre del Archivo</th>
+                <th>Fecha de Creación</th>
+                <th>Tamaño</th>
+                <th>Tipo</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for b in backups %}
+              <tr>
+                <td style="font-family: monospace; font-size: 0.9rem;">{{ b.filename }}</td>
+                <td>{{ b.date }}</td>
+                <td>{{ b.size }}</td>
+                <td>
+                  {% if b.type == 'Diario' %}
+                    <span class="badge badge-diario">Diario</span>
+                  {% elif b.type == 'Semanal' %}
+                    <span class="badge badge-semanal">Semanal</span>
+                  {% elif b.type == 'Mensual' %}
+                    <span class="badge badge-mensual">Mensual</span>
+                  {% else %}
+                    <span class="badge badge-manual">Manual</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="actions">
+                    <form method="POST" action="/respaldos/restaurar" class="inline-form" onsubmit="return confirm('ATENCIÓN: Esto sobrescribirá la base de datos actual con los datos del respaldo. ¿Estás seguro de restaurar {{ b.filename }}?');">
+                      <input type="hidden" name="filename" value="{{ b.filename }}">
+                      <button type="submit" class="btn btn-warning" style="padding: 4px 10px; font-size: 0.8rem;">Restaurar</button>
+                    </form>
+                    <form method="POST" action="/respaldos/eliminar" class="inline-form" onsubmit="return confirm('¿Estás seguro de eliminar el respaldo {{ b.filename }} de forma permanente?');">
+                      <input type="hidden" name="filename" value="{{ b.filename }}">
+                      <button type="submit" class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;">Eliminar</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 30px; color: var(--muted);">No hay respaldos disponibles. Crea uno manual o espera a que se ejecute la programación automática.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- RESTORE MODAL -->
+<div id="restoreModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Restaurar Respaldo</div>
+      <button class="close" onclick="closeRestoreModal()">&times;</button>
+    </div>
+    <form method="POST" action="/respaldos/restaurar" onsubmit="return confirm('ATENCIÓN: Esto sobrescribirá la base de datos actual con los datos del respaldo seleccionado. ¿Deseas continuar?');">
+      <div class="fg">
+        <label>Seleccionar Respaldo</label>
+        <select name="filename" required>
+          {% for b in backups %}
+            <option value="{{ b.filename }}">{{ b.filename }} ({{ b.date }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeRestoreModal()">Cancelar</button>
+        <button type="submit" class="btn btn-warning">Restaurar Base de Datos</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function id(x) { return document.getElementById(x); }
+  function showMsg(el, text, type) { el.textContent = text; el.className = 'msg on ' + type; }
+
+  async function loadDataset() {
+    const btn = id('btnLoad'), spin = id('loadSpin'), msg = id('loadMsg');
+    btn.disabled = true; spin.classList.add('on'); msg.className = 'msg';
+    try {
+      const r = await fetch('/load-data', { method: 'POST' });
+      const d = await r.json();
+      if (d.status === 'success') { showMsg(msg, d.message, 'ok'); }
+      else showMsg(msg, d.message, 'err');
+    } catch(e) { showMsg(msg, 'Error de conexión: ' + e.message, 'err'); }
+    finally { btn.disabled = false; spin.classList.remove('on'); }
+  }
+
+  function openRestoreModal() {
+    document.getElementById('restoreModal').classList.add('show');
+  }
+  function closeRestoreModal() {
+    document.getElementById('restoreModal').classList.remove('show');
+  }
+
+  // Real-time DB status poll
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/db-status');
+      const data = await res.json();
+      const dot = document.getElementById('dbStatusDot');
+      const text = document.getElementById('dbStatusText');
+      if (data.status === 'online') {
+        dot.className = 'status-dot status-online';
+        text.textContent = 'Base de Datos Conectada';
+      } else {
+        dot.className = 'status-dot status-offline';
+        text.textContent = 'Base de Datos Caída';
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, 10000); // Check every 10s on UI
+</script>
+
+
+<!-- SIDEBAR DB POLL SCRIPT -->
+<style>
+  .sidebar-nav-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--red); box-shadow: 0 0 5px var(--red); animation: sbb-blink 1s infinite; margin-left: 5px; }
+  @keyframes sbb-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+</style>
+<script>
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/db-status');
+      const data = await res.json();
+      const navItems = document.querySelectorAll('.nav-item');
+      navItems.forEach(item => {
+        if (item.textContent.includes('Respaldos')) {
+          const hasDot = item.querySelector('.sidebar-nav-dot');
+          if (data.status === 'offline' && !hasDot) {
+            const dot = document.createElement('span');
+            dot.className = 'sidebar-nav-dot';
+            item.appendChild(dot);
+          } else if (data.status === 'online' && hasDot) {
+            hasDot.remove();
+          }
+        }
+      });
+    } catch (e) {
+      // ignore
+    }
+  }, 5000);
+</script>
+
+</body>
+</html>

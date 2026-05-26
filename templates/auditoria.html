@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Auditoría — VinAnalytics Group</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:        #060305;
+      --surface:   rgba(255,255,255,0.035);
+      --surface2:  rgba(255,255,255,0.06);
+      --border:    rgba(155,31,66,0.2);
+      --border-s:  rgba(255,255,255,0.06);
+      --accent:    #9b1f42;
+      --accent2:   #d97a98;
+      --gold:      #c9933a;
+      --text:      #f5eef0;
+      --muted:     #7a6872;
+      --radius:    16px;
+      --success:   #22a35f;
+      --danger:    #ef4444;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+      background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;
+    }
+    body::before{
+      content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse 70% 40% at 5% 0%,rgba(155,31,66,.12) 0%,transparent 60%),
+        radial-gradient(ellipse 50% 50% at 95% 100%,rgba(201,147,58,.07) 0%,transparent 60%);
+    }
+
+    /* ── SIDEBAR & LAYOUT ── */
+    .app-container { display: flex; min-height: 100vh; position:relative; z-index:1; }
+    .sidebar {
+      width: 240px; background: rgba(10,5,8,.95);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0;
+      position: sticky; top: 0; height: 100vh;
+      backdrop-filter: blur(20px);
+    }
+    .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); text-align: center; }
+    .logo{
+      font-size:1.05rem;font-weight:800;letter-spacing:.02em;color:var(--text);
+      text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    .logo span{color:var(--gold)}
+    .sidebar-nav { flex: 1; padding: 16px 0; display: flex; flex-direction: column; gap: 3px; }
+    .nav-item {
+      padding: 11px 18px; color: var(--text); text-decoration: none;
+      display: flex; align-items: center; gap: 10px; font-weight: 500;
+      transition: background .2s; border-right: 3px solid transparent;
+      font-size:.9rem; border-radius: 0;
+    }
+    .nav-item:hover { background: rgba(155,31,66,.1); }
+    .nav-item.active { background: rgba(155,31,66,.15); color: var(--accent2); border-right-color: var(--accent2); }
+    .sidebar-footer { padding: 18px; border-top: 1px solid var(--border); }
+    .user-info { margin-bottom: 12px; font-size: 0.88rem; color: var(--text); text-align: center; }
+    .user-role { font-size: .72rem; color: var(--accent2); font-weight: 700; margin-top: 4px; text-transform:uppercase; letter-spacing:.06em; }
+    .content-wrapper { flex: 1; display: flex; flex-direction: column; overflow-x: hidden; }
+
+    .btn{
+      padding:8px 18px;border:none;border-radius:10px;font-size:.88rem;font-weight:600;
+      cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;
+      gap:6px;justify-content:center;text-decoration:none;
+    }
+    .btn-primary{background:linear-gradient(135deg,var(--accent),#6e1430);color:#fff}
+    .btn-primary:hover{filter:brightness(1.15);transform:translateY(-1px)}
+    .btn-secondary{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--border-s)}
+    .btn-secondary:hover{background:rgba(255,255,255,.08)}
+
+    .main{max-width:1440px;width:100%;margin:0 auto;padding:22px 26px}
+
+    /* ── FILTERS ── */
+    .filters{
+      background:var(--surface);border-radius:var(--radius);
+      padding:18px 22px;margin-bottom:20px;border:1px solid var(--border-s);
+      backdrop-filter:blur(8px);
+    }
+    .filters-title{font-size:.88rem;font-weight:700;color:var(--gold);margin-bottom:14px;display:flex;align-items:center;gap:7px}
+    .filters-form{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;}
+    .fg{display:flex;flex-direction:column;gap:5px}
+    .fg label{font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+    .fg input{
+      padding:9px 11px;background:rgba(255,255,255,.04);border:1px solid var(--border-s);
+      border-radius:10px;color:var(--text);font-size:.88rem;
+    }
+    .fg input:focus{outline:none;border-color:var(--accent2);box-shadow:0 0 0 3px rgba(217,122,152,.12)}
+
+    /* ── TABLE ── */
+    .table-section{
+      background:var(--surface);border-radius:var(--radius);
+      padding:18px 22px;border:1px solid var(--border-s);
+      backdrop-filter:blur(8px);
+    }
+    .table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+    .table-title{font-size:.9rem;font-weight:700;color:var(--text)}
+    .tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border-s)}
+    table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:.83rem}
+    thead tr{background:rgba(0,0,0,.25)}
+    th{
+      padding:11px 13px;text-align:left;font-weight:700;color:var(--gold);
+      border-bottom:1px solid var(--border-s);letter-spacing:.04em;
+      font-size:.7rem;text-transform:uppercase;
+    }
+    td{padding:10px 13px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--text)}
+    tr:last-child td{border-bottom:none}
+    tbody tr{transition:background .15s}
+    tbody tr:hover{background:rgba(155,31,66,.06)}
+    .badge{padding:3px 9px;border-radius:99px;font-weight:700;font-size:.7rem;}
+    .badge-admin{background:rgba(201,147,58,.2);color:var(--gold);}
+    .badge-user{background:rgba(122,104,114,.15);color:var(--muted);}
+
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(155,31,66,.35);border-radius:3px}
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="/" class="logo">🍷 <span>Vin</span>Analytics Group</a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">📊 Dashboard</a>
+      {% if session.get('rol') == 'admin' %}
+      <a href="/auditoria" class="nav-item {% if request.path == '/auditoria' %}active{% endif %}">📋 Auditoría</a>
+      <a href="/usuarios" class="nav-item {% if request.path == '/usuarios' %}active{% endif %}">👤 Usuarios</a>
+      <a href="/respaldos" class="nav-item {% if request.path == '/respaldos' %}active{% endif %}">💾 Respaldos</a>
+      {% endif %}
+      <a href="/reportes" class="nav-item {% if request.path == '/reportes' %}active{% endif %}">📄 Reportes</a>
+      <a href="/configuracion" class="nav-item {% if request.path == '/configuracion' %}active{% endif %}">⚙️ Configuración</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div style="font-weight:bold;">{{ session['username'] }}</div>
+        <div class="user-role">{{ session['rol'] | upper }}</div>
+      </div>
+      <a href="/logout" class="btn" style="background: #ef4444; color: white; width: 100%;">🚪 Cerrar Sesión</a>
+    </div>
+  </aside>
+
+  <div class="content-wrapper">
+    <div class="main">
+      <h1 style="font-size:1.5rem; margin-bottom: 20px;">Auditoría del Sistema</h1>
+  
+  <div class="filters">
+    <div class="filters-title">🔍 Filtros de Auditoría</div>
+    <form class="filters-form" method="GET" action="/auditoria">
+      <div class="fg">
+        <label>Usuario</label>
+        <input type="text" name="usuario" value="{{ filtros.get('usuario', '') }}" placeholder="Buscar usuario...">
+      </div>
+      <div class="fg">
+        <label>Acción</label>
+        <input type="text" name="accion" value="{{ filtros.get('accion', '') }}" placeholder="Buscar acción...">
+      </div>
+      <div class="fg">
+        <label>Fecha</label>
+        <input type="date" name="fecha" value="{{ filtros.get('fecha', '') }}">
+      </div>
+      <button type="submit" class="btn btn-primary">Filtrar</button>
+      <a href="/auditoria" class="btn btn-secondary">Limpiar</a>
+    </form>
+  </div>
+
+  <div class="table-section">
+    <div class="table-header">
+      <div class="table-title">Últimos Eventos (Max 500)</div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Fecha</th>
+            <th>Usuario</th>
+            <th>Rol</th>
+            <th>Acción</th>
+            <th>Detalle</th>
+            <th>IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ev in eventos %}
+          <tr>
+            <td>{{ ev.id }}</td>
+            <td>{{ ev.fecha }}</td>
+            <td>{{ ev.usuario }}</td>
+            <td><span class="badge {{ 'badge-admin' if ev.rol == 'admin' else 'badge-user' }}">{{ ev.rol }}</span></td>
+            <td style="font-weight: 600; color: var(--accent2);">{{ ev.accion }}</td>
+            <td style="white-space: normal; max-width: 300px;">{{ ev.detalle }}</td>
+            <td>{{ ev.ip }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" style="text-align: center; padding: 20px; color: var(--muted);">No hay eventos que coincidan con los filtros.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- SIDEBAR DB POLL SCRIPT -->
+<style>
+  .sidebar-nav-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--red); box-shadow: 0 0 5px var(--red); animation: sbb-blink 1s infinite; margin-left: 5px; }
+  @keyframes sbb-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+</style>
+<script>
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/db-status');
+      const data = await res.json();
+      const navItems = document.querySelectorAll('.nav-item');
+      navItems.forEach(item => {
+        if (item.textContent.includes('Respaldos')) {
+          const hasDot = item.querySelector('.sidebar-nav-dot');
+          if (data.status === 'offline' && !hasDot) {
+            const dot = document.createElement('span');
+            dot.className = 'sidebar-nav-dot';
+            item.appendChild(dot);
+          } else if (data.status === 'online' && hasDot) {
+            hasDot.remove();
+          }
+        }
+      });
+    } catch (e) {
+      // ignore
+    }
+  }, 5000);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+
+  # ── PocketBase: fuente de datos raw ──────────────────────────────────────
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: vinanalytics-pocketbase
+    ports:
+      - "8090:8090"
+    command: ["serve", "--http=0.0.0.0:8090"]
+    volumes:
+      - pocketbase_data:/pb/pb_data
+
+  # ── StarRocks: analytics + usuarios + auditoría ───────────────────────────
+  starrocks:
+    image: starrocks/allin1-ubuntu:latest
+    container_name: vinanalytics-starrocks
+    ports:
+      - "9030:9030"   # MySQL protocol
+      - "8030:8030"   # FE web UI
+      - "8040:8040"   # BE HTTP
+    volumes:
+      - starrocks_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -P 9030 -u root -e 'SELECT 1;' 2>/dev/null"]
+      interval: 30s
+      timeout: 15s
+      retries: 12
+      start_period: 120s
+
+  # ── Flask: servidor web ───────────────────────────────────────────────────
+  flask:
+    build: .
+    container_name: vinanalytics-flask
+    ports:
+      - "5000:5000"
+    environment:
+      - STARROCKS_HOST=starrocks
+      - POCKETBASE_URL=http://pocketbase:8090
+      - SECRET_KEY=vinanalytics-docker-secret-2024
+    depends_on:
+      starrocks:
+        condition: service_healthy
+      pocketbase:
+        condition: service_started
+    volumes:
+      - ./stage:/app/stage
+      - ./backups:/app/backups
+      - ./templates:/app/templates
+      - ./app.py:/app/app.py
+      - ./auth.py:/app/auth.py
+      - ./audit.py:/app/audit.py
+      - ./models.py:/app/models.py
+      - ./backup_manager.py:/app/backup_manager.py
+      - ./csv_loader.py:/app/csv_loader.py
+      - ./db_manager.py:/app/db_manager.py
+      - ./config.py:/app/config.py
+      - ./etl:/app/etl
+      - ./db:/app/db
+      - ./data:/app/data
+
+volumes:
+  pocketbase_data:
+  starrocks_data:

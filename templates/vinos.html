@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vinos — VinAnalytics Group</title>
+  <style>
+    :root {
+      --wine:#8B1A1A; --wine-dark:#5C0E0E; --gold:#C9A84C;
+      --bg:#F5F0EA; --border:#DDD5C8; --text:#1a1a1a; --muted:#777; --link:#7B1414;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+    a { text-decoration:none; color:var(--link); }
+    a:hover { text-decoration:underline; }
+
+    /* NAV */
+    .header { background:#1a0a0a; padding:14px 0; position:sticky; top:0; z-index:200; }
+    .header-inner { max-width:1280px; margin:0 auto; padding:0 24px; display:flex; align-items:center; gap:20px; }
+    .logo { color:#fff; font-size:22px; font-weight:900; letter-spacing:-.5px; min-width:180px; }
+    .logo em { color:var(--gold); font-style:normal; }
+    .searchbox { flex:1; display:flex; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); border-radius:24px; overflow:hidden; }
+    .searchbox input { flex:1; padding:9px 18px; background:transparent; border:none; outline:none; color:#fff; font-size:14px; }
+    .searchbox input::placeholder { color:rgba(255,255,255,.45); }
+    .searchbox button { background:var(--wine); color:#fff; border:none; padding:9px 20px; cursor:pointer; border-radius:0 24px 24px 0; font-size:15px; }
+    .header-actions { display:flex; gap:10px; align-items:center; flex-shrink:0; }
+    .hbtn { color:rgba(255,255,255,.8); font-size:13px; padding:8px 14px; border-radius:4px; border:1px solid rgba(255,255,255,.2); }
+    .hbtn:hover { background:rgba(255,255,255,.1); text-decoration:none; color:#fff; }
+    .hbtn.primary { background:var(--wine); color:#fff; border-color:var(--wine); }
+    .hbtn.primary:hover { background:var(--wine-dark); }
+
+    .subnav { background:#fff; border-bottom:1px solid var(--border); }
+    .subnav-inner { max-width:1280px; margin:0 auto; padding:0 24px; display:flex; align-items:center; gap:0; }
+    .subnav a { color:#555; font-size:13px; font-weight:600; padding:11px 16px; display:block; border-bottom:2px solid transparent; }
+    .subnav a:hover { color:var(--wine); text-decoration:none; }
+    .subnav a.active { color:var(--wine); border-bottom-color:var(--wine); }
+
+    /* MAIN */
+    .page-wrap { max-width:1280px; margin:0 auto; padding:20px 24px; display:grid; grid-template-columns:220px 1fr; gap:20px; align-items:start; }
+
+    /* BROWSE */
+    .browse { background:#fff; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+    .browse-hd { background:var(--wine); color:#fff; font-size:12px; font-weight:800; padding:10px 14px; text-transform:uppercase; letter-spacing:.8px; }
+    .bsec { border-bottom:1px solid #eee; padding:12px 14px; }
+    .bsec:last-child { border-bottom:none; }
+    .bsec h4 { font-size:10px; font-weight:800; color:#999; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:9px; }
+    .bsec ul { list-style:none; }
+    .bsec ul li { margin-bottom:5px; line-height:1.4; }
+    .bsec ul li a { font-size:13px; color:var(--link); }
+    .bsec ul li small { color:#bbb; }
+    .bsec .more { font-size:11px; color:var(--muted); font-style:italic; margin-top:7px; display:inline-block; }
+    .bsec .more:hover { color:var(--wine); }
+    .pgrid { display:grid; grid-template-columns:1fr 1fr; gap:5px 10px; }
+    .pgrid a { font-size:12px; color:var(--link); }
+    .sdot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+
+    /* RIGHT */
+    .right { display:flex; flex-direction:column; gap:16px; }
+    .panel { background:#fff; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+    .panel-hd { background:#f8f3ee; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 14px; }
+    .panel-title { font-size:13px; font-weight:800; color:#444; text-transform:uppercase; letter-spacing:.5px; padding:11px 0; }
+    .tabs { display:flex; }
+    .tab { background:none; border:none; border-bottom:2px solid transparent; padding:11px 15px; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer; }
+    .tab:hover { color:var(--wine); }
+    .tab.on { color:var(--wine); border-bottom-color:var(--wine); background:#fff; }
+
+    .wine-list { list-style:none; }
+    .wi { display:flex; align-items:center; gap:14px; padding:11px 14px; border-bottom:1px solid #f5f0ea; transition:background .1s; cursor:pointer; }
+    .wi:last-child { border-bottom:none; }
+    .wi:hover { background:#fdf8f3; }
+    .wsc { flex-shrink:0; width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; color:#fff; }
+    .s95{background:#1a7a1a} .s90{background:#4a8a2a} .s85{background:#8a9a2a} .s80{background:#c9a04c}
+    .winfo { flex:1; min-width:0; }
+    .wname { font-size:14px; font-weight:700; color:var(--link); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .wmeta { font-size:12px; color:var(--muted); margin-top:2px; }
+    .wtag  { display:inline-block; background:#f0ebe4; color:#666; font-size:10px; padding:2px 7px; border-radius:10px; margin-top:3px; }
+    .wright { flex-shrink:0; text-align:right; }
+    .wprice { font-size:16px; font-weight:800; color:var(--wine-dark); }
+    .wcountry { font-size:11px; color:var(--muted); margin-top:2px; }
+
+    /* pagination */
+    .pager { display:flex; justify-content:center; gap:6px; padding:14px; border-top:1px solid #eee; }
+    .pager button { background:#fff; border:1px solid var(--border); border-radius:4px; padding:6px 12px; font-size:13px; cursor:pointer; color:var(--link); }
+    .pager button:hover { background:var(--wine); color:#fff; border-color:var(--wine); }
+    .pager button.on { background:var(--wine); color:#fff; border-color:var(--wine); }
+
+    /* skeleton */
+    .sk { background:linear-gradient(90deg,#f0e8e0 25%,#e8ddd4 50%,#f0e8e0 75%); background-size:200% 100%; animation:sh 1.3s infinite; border-radius:3px; }
+    @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .ski { display:flex; gap:14px; padding:11px 14px; border-bottom:1px solid #f5f0ea; align-items:center; }
+    .skc { width:46px; height:46px; border-radius:50%; flex-shrink:0; }
+    .skl { flex:1; }
+    .skr { height:12px; margin-bottom:5px; border-radius:3px; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-inner">
+    <a href="/" class="logo">🍷 Vin<em>Analytics</em></a>
+    <div class="searchbox">
+      <input type="text" id="srch" placeholder="Buscar vino, bodega, variedad o país...">
+      <button onclick="doSearch()">🔍</button>
+    </div>
+    <div class="header-actions">
+      {% if session.username %}
+        <span class="hbtn" style="border:none;color:rgba(255,255,255,.7);">👤 {{ session.username }}</span>
+        <a href="/logout" class="hbtn">Salir</a>
+        {% if session.rol == 'admin' %}
+          <a href="/admin" class="hbtn primary">⚙️ Administración</a>
+        {% else %}
+          <a href="/dashboard" class="hbtn primary">📊 Dashboard</a>
+        {% endif %}
+      {% else %}
+        <a href="/login" class="hbtn">Iniciar sesión</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<!-- SUBNAV -->
+<div class="subnav">
+  <div class="subnav-inner">
+    <a href="/">Inicio</a>
+    <a href="/vinos" class="active">Vinos</a>
+    <a href="#">Tintos</a>
+    <a href="#">Blancos</a>
+    <a href="#">Rosados</a>
+    <a href="#">Espumosos</a>
+    <a href="#">Bodegas</a>
+  </div>
+</div>
+
+<!-- PAGE -->
+<div class="page-wrap">
+
+  <!-- BROWSE -->
+  <aside class="browse">
+    <div class="browse-hd">🔍 Filtrar Vinos</div>
+
+    <div class="bsec">
+      <h4>Precio</h4>
+      <div class="pgrid">
+        <a href="#" onclick="applyFilter('precio_max','20')">$20 y menos</a>
+        <a href="#" onclick="applyFilter('precio_max','40')">$20 – $40</a>
+        <a href="#" onclick="applyFilter('precio_max','80')">$40 – $80</a>
+        <a href="#" onclick="applyFilter('precio_max','99999')">$80 y más</a>
+      </div>
+    </div>
+
+    <div class="bsec">
+      <h4>Tipo y Color</h4>
+      <ul>
+        <li><a href="#">🍷 Tinto</a></li>
+        <li><a href="#">🥂 Blanco</a></li>
+        <li><a href="#">🌸 Rosado</a></li>
+        <li><a href="#">🍾 Espumoso</a></li>
+      </ul>
+    </div>
+
+    <div class="bsec">
+      <h4>Puntuación</h4>
+      <ul>
+        <li><a href="#" onclick="applyFilter('puntos_min','95')"><span class="sdot" style="background:#1a7a1a"></span>95 – 100 pts</a></li>
+        <li><a href="#" onclick="applyFilter('puntos_min','90')"><span class="sdot" style="background:#4a8a2a"></span>90 – 94 pts</a></li>
+        <li><a href="#" onclick="applyFilter('puntos_min','85')"><span class="sdot" style="background:#8a9a2a"></span>85 – 89 pts</a></li>
+        <li><a href="#" onclick="applyFilter('puntos_min','80')"><span class="sdot" style="background:#c9a04c"></span>80 – 84 pts</a></li>
+      </ul>
+    </div>
+
+    <div class="bsec">
+      <h4>Variedad</h4>
+      <ul id="bv"></ul>
+      <a href="#" class="more">Ver todas →</a>
+    </div>
+
+    <div class="bsec">
+      <h4>País</h4>
+      <ul id="bp"></ul>
+      <a href="#" class="more">Ver todos →</a>
+    </div>
+
+    <div class="bsec">
+      <h4>Región</h4>
+      <ul id="br"></ul>
+      <a href="#" class="more">Ver todas →</a>
+    </div>
+
+    <div class="bsec">
+      <h4>Bodega</h4>
+      <ul id="bb"></ul>
+      <a href="#" class="more">Ver todas →</a>
+    </div>
+  </aside>
+
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="panel">
+      <div class="panel-hd">
+        <span class="panel-title">🏆 Vinos</span>
+        <div class="tabs">
+          <button class="tab on" onclick="setTab('top',this)">Mejor Puntuados</button>
+          <button class="tab"    onclick="setTab('precio',this)">Por Precio</button>
+          <button class="tab"    onclick="setTab('todos',this)">Todos</button>
+        </div>
+      </div>
+      <ul class="wine-list" id="wlist">
+        {% for i in range(10) %}
+        <li class="ski"><div class="sk skc"></div><div class="skl"><div class="sk skr" style="width:70%"></div><div class="sk skr" style="width:45%"></div></div></li>
+        {% endfor %}
+      </ul>
+      <div class="pager" id="pager"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const FLAGS={'US':'🇺🇸','Italy':'🇮🇹','France':'🇫🇷','Spain':'🇪🇸','Portugal':'🇵🇹','Argentina':'🇦🇷','Chile':'🇨🇱','Australia':'🇦🇺','Austria':'🇦🇹','Germany':'🇩🇪','New Zealand':'🇳🇿','South Africa':'🇿🇦','Greece':'🇬🇷','Hungary':'🇭🇺'};
+  let currentPage=1, currentMode='top', filters={};
+
+  function sc(p){ return p>=95?'s95':p>=90?'s90':p>=85?'s85':'s80'; }
+
+  async function loadWines(page=1){
+    const list=document.getElementById('wlist');
+    list.innerHTML=Array(8).fill(`<li class="ski"><div class="sk skc"></div><div class="skl"><div class="sk skr" style="width:70%"></div><div class="sk skr" style="width:45%"></div></div></li>`).join('');
+    let url=`/api/resenas?per_page=15&page=${page}`;
+    if(currentMode==='top') url+='&puntos_min=88';
+    Object.entries(filters).forEach(([k,v])=>{ url+=`&${k}=${encodeURIComponent(v)}`; });
+    try{
+      const r=await fetch(url), d=await r.json();
+      if(!d.data||d.data.length===0){
+        list.innerHTML='<li style="padding:32px;text-align:center;color:#aaa;">Sin resultados para estos filtros.</li>';
+        document.getElementById('pager').innerHTML=''; return;
+      }
+      list.innerHTML=d.data.map(w=>{
+        const f=FLAGS[w.pais]||'🌍';
+        const pr=w.price>0?`$${parseFloat(w.price).toFixed(0)}`:'N/D';
+        return `<li class="wi">
+          <div class="wsc ${sc(w.points)}">${w.points}</div>
+          <div class="winfo">
+            <div class="wname">${w.title||'Sin título'}</div>
+            <div class="wmeta">${w.bodega||''} · ${w.provincia||w.region||''}</div>
+            <span class="wtag">${w.variedad||''}</span>
+          </div>
+          <div class="wright">
+            <div class="wprice">${pr}</div>
+            <div class="wcountry">${f} ${w.pais}</div>
+          </div>
+        </li>`;
+      }).join('');
+      renderPager(d.total_pages, page);
+    } catch { list.innerHTML='<li style="padding:32px;text-align:center;color:#aaa;">Error de conexión.</li>'; }
+  }
+
+  function renderPager(total, cur){
+    const pg=document.getElementById('pager');
+    if(total<=1){pg.innerHTML='';return;}
+    let h='';
+    if(cur>1) h+=`<button onclick="goPage(${cur-1})">‹ Anterior</button>`;
+    const from=Math.max(1,cur-2), to=Math.min(total,cur+2);
+    for(let i=from;i<=to;i++) h+=`<button class="${i===cur?'on':''}" onclick="goPage(${i})">${i}</button>`;
+    if(cur<total) h+=`<button onclick="goPage(${cur+1})">Siguiente ›</button>`;
+    pg.innerHTML=h;
+  }
+
+  function goPage(p){ currentPage=p; loadWines(p); window.scrollTo(0,0); }
+
+  function setTab(mode, btn){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+    btn.classList.add('on');
+    currentMode=mode; currentPage=1; loadWines(1);
+  }
+
+  function applyFilter(key, val){
+    filters[key]=val; currentPage=1; loadWines(1);
+    event.preventDefault();
+  }
+
+  async function loadBrowse(){
+    try{
+      const r=await fetch('/api/browse'), d=await r.json();
+      if(d.error) return;
+      document.getElementById('bv').innerHTML=d.variedades.map(v=>`<li><a href="#" onclick="applyFilter('variedad','${v.nombre}');return false;">${v.nombre}</a> <small>(${v.total.toLocaleString()})</small></li>`).join('');
+      document.getElementById('bp').innerHTML=d.paises.map(p=>`<li><a href="#" onclick="applyFilter('pais','${p.nombre}');return false;">${FLAGS[p.nombre]||'🌍'} ${p.nombre}</a> <small>(${p.total.toLocaleString()})</small></li>`).join('');
+      document.getElementById('br').innerHTML=d.regiones.map(r=>`<li><a href="#" onclick="return false;">${r.nombre}</a> <small>(${r.total.toLocaleString()})</small></li>`).join('');
+      document.getElementById('bb').innerHTML=d.bodegas.map(b=>`<li><a href="#" onclick="applyFilter('bodega','${b.nombre}');return false;">${b.nombre}</a> <small>(${b.total.toLocaleString()})</small></li>`).join('');
+    } catch {}
+  }
+
+  function doSearch(){
+    const q=document.getElementById('srch').value.trim();
+    if(q){ filters.bodega=q; currentPage=1; loadWines(1); }
+  }
+  document.getElementById('srch').addEventListener('keydown',e=>{ if(e.key==='Enter') doSearch(); });
+
+  loadWines(1);
+  loadBrowse();
+</script>
+</body>
+</html>
