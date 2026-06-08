@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(docker exec *)",
-      "PowerShell(docker exec vinanalytics-pocketbase ls /)"
-    ]
-  }
-}
