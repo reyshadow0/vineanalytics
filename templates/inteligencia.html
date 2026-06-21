@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Inteligencia Predictiva — VinAnalytics Group</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#060305;--card:#0d0810;--glass:rgba(255,255,255,0.035);
+      --border:rgba(180,48,78,0.2);--border-s:rgba(255,255,255,0.06);
+      --accent:#9b1f42;--accent2:#d97a98;--gold:#c9933a;
+      --verde:#22a35f;--amarillo:#d4870f;--rojo:#ef4444;
+      --text:#f5eef0;--muted:#7a6872;--radius:18px;--radius-s:10px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    :root{color-scheme:dark;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+      background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;}
+    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:radial-gradient(ellipse 80% 40% at 5% 0%,rgba(155,31,66,.12) 0%,transparent 60%),
+                 radial-gradient(ellipse 60% 50% at 95% 100%,rgba(201,147,58,.08) 0%,transparent 60%);}
+    a{color:inherit;text-decoration:none;}
+    .navbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;
+      padding:0 28px;height:62px;background:rgba(10,5,8,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);}
+    .navbar-logo{display:flex;align-items:center;gap:10px;font-size:1.1rem;font-weight:800;}
+    .logo-icon{font-size:1.4rem;filter:drop-shadow(0 0 10px rgba(201,147,58,.5));}
+    .logo-name span{color:var(--gold);}
+    .logo-group{font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;display:block;margin-top:-3px;}
+    .navbar-sep{width:1px;height:22px;background:var(--border);}
+    .navbar-title{font-size:.82rem;color:var(--muted);}
+    .navbar-right{display:flex;align-items:center;gap:14px;}
+    .navbar-right a{color:#ccc;font-size:13px;}
+    .navbar-right a:hover{color:var(--gold);}
+    .main{max-width:1440px;margin:0 auto;padding:24px 28px;position:relative;z-index:1;}
+    .head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px;}
+    .head h1{font-size:1.5rem;font-weight:800;}
+    .head h1 span{color:var(--gold);}
+    .head .sub{font-size:.85rem;color:var(--muted);margin-top:4px;}
+    .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:var(--radius-s);
+      font-size:.82rem;font-weight:600;cursor:pointer;border:none;transition:all .2s;
+      background:transparent;color:var(--accent2);border:1px solid rgba(217,122,152,.4);}
+    .btn:hover{background:rgba(155,31,66,.12);}
+    .persp{margin-bottom:34px;}
+    .persp-title{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+    .persp-title h2{font-size:1.05rem;font-weight:800;}
+    .persp-title .cu{font-size:.62rem;font-weight:700;color:var(--muted);padding:2px 8px;border-radius:5px;border:1px solid var(--border-s);}
+    .persp-title::after{content:'';flex:1;height:1px;background:var(--border);}
+    .persp .model{font-size:.74rem;color:var(--muted);margin-bottom:14px;font-style:italic;}
+    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:16px;}
+    @media(max-width:900px){.cards{grid-template-columns:repeat(2,1fr);}}
+    .card{background:var(--glass);border:1px solid var(--border-s);border-radius:var(--radius);padding:16px 18px;backdrop-filter:blur(8px);}
+    .card .lbl{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+    .card .val{font-size:1.8rem;font-weight:800;margin-top:4px;}
+    .card .vsub{font-size:.72rem;color:var(--muted);margin-top:2px;}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
+    .panel{background:var(--glass);border:1px solid var(--border-s);border-radius:var(--radius);padding:20px;backdrop-filter:blur(8px);}
+    .panel-title{font-size:.85rem;font-weight:700;margin-bottom:14px;}
+    .chart-wrap{position:relative;height:260px;}
+    table{width:100%;border-collapse:collapse;font-size:.82rem;}
+    th{padding:10px 12px;text-align:left;font-size:.66rem;font-weight:700;color:var(--gold);
+      text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid rgba(201,147,58,.25);white-space:nowrap;}
+    td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap;}
+    tbody tr:hover{background:rgba(155,31,66,.07);}
+    .table-wrap{overflow-x:auto;border-radius:var(--radius-s);border:1px solid var(--border-s);max-height:420px;overflow-y:auto;}
+    .badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.7rem;font-weight:700;}
+    .b-alto{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);}
+    .b-medio{background:rgba(212,135,15,.15);color:#e3a93f;border:1px solid rgba(212,135,15,.3);}
+    .b-bajo{background:rgba(34,163,95,.15);color:#5fd896;border:1px solid rgba(34,163,95,.3);}
+    .bar{height:7px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;min-width:70px;}
+    .bar i{display:block;height:100%;border-radius:4px;}
+    .seg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;}
+    @media(max-width:900px){.seg-grid{grid-template-columns:1fr;}}
+    .seg{background:var(--glass);border:1px solid var(--border-s);border-radius:var(--radius);padding:16px;}
+    .seg h3{font-size:.92rem;font-weight:800;margin-bottom:3px;}
+    .seg .n{font-size:1.5rem;font-weight:800;color:var(--gold);}
+    .seg .est{font-size:.74rem;color:var(--muted);margin:6px 0 8px;}
+    .seg .ej{font-size:.72rem;color:var(--accent2);}
+    .anom-banner{padding:14px 20px;border-radius:var(--radius);margin-bottom:16px;font-weight:700;
+      border:1px solid var(--border-s);background:var(--glass);}
+    .anom-ok{border-color:rgba(34,163,95,.3);color:#5fd896;}
+    .anom-bad{border-color:rgba(239,68,68,.3);color:#f87171;}
+    .pill{display:inline-block;font-size:.72rem;padding:3px 10px;border-radius:99px;margin:2px;
+      background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);}
+    #toast-wrap{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px;}
+    .toast{padding:12px 18px;border-radius:var(--radius-s);font-size:.85rem;font-weight:600;color:#fff;box-shadow:0 4px 24px rgba(0,0,0,.6);}
+    .toast.error{background:rgba(239,68,68,.9);}
+    .toast.info{background:rgba(155,31,66,.9);}
+    .empty{padding:40px;text-align:center;color:var(--muted);}
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div class="navbar-logo"><span class="logo-icon">🍷</span>
+      <div class="logo-name">Vin<span>Analytics</span><span class="logo-group">Group</span></div></div>
+    <div class="navbar-sep"></div>
+    <span class="navbar-title">Inteligencia Predictiva · IA / ML</span>
+  </div>
+  <div class="navbar-right">
+    <a href="/">← Inicio</a>
+    <a href="/dashboard">Dashboard BI</a>
+    <a href="/balanced-scorecard">Balanced Scorecard</a>
+    <a href="/api-docs">API Pública</a>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="head">
+    <div>
+      <h1>Centro de <span>Inteligencia Artificial</span></h1>
+      <div class="sub">Churn · Segmentación RFM · Precios dinámicos · Detección de anomalías — OE4 (secciones 9.10–9.11)</div>
+    </div>
+    <button class="btn" onclick="loadAll()">↻ Recalcular modelos</button>
+  </div>
+
+  <!-- CHURN -->
+  <section class="persp">
+    <div class="persp-title"><h2>🔮 Predicción de Churn</h2><span class="cu">CU-E05 · CU-T09 · CU-O12</span></div>
+    <div class="model" id="churn-model"></div>
+    <div class="cards" id="churn-cards"></div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">Distribución de riesgo</div>
+        <div class="chart-wrap"><canvas id="c-churn-dist"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">⚠️ Cuentas prioritarias para Customer Success</div>
+        <div class="table-wrap"><table id="churn-table"><thead><tr>
+          <th>Cuenta</th><th>País</th><th>Plan</th><th>Riesgo</th><th>Prob.</th><th>Factor</th><th>Acción</th>
+        </tr></thead><tbody><tr><td class="empty" colspan="7">Cargando…</td></tr></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEGMENTACION -->
+  <section class="persp">
+    <div class="persp-title"><h2>👥 Segmentación de Clientes (RFM)</h2><span class="cu">CU-T02</span></div>
+    <div class="model" id="seg-model"></div>
+    <div class="grid2" style="margin-bottom:16px;">
+      <div class="panel"><div class="panel-title">Clientes por segmento</div>
+        <div class="chart-wrap"><canvas id="c-seg"></canvas></div></div>
+      <div class="panel"><div class="panel-title">LTV total por segmento ($)</div>
+        <div class="chart-wrap"><canvas id="c-seg-ltv"></canvas></div></div>
+    </div>
+    <div class="seg-grid" id="seg-grid"></div>
+  </section>
+
+  <!-- PRECIOS -->
+  <section class="persp">
+    <div class="persp-title"><h2>💲 Precios Dinámicos y Demanda</h2><span class="cu">CU-T08 · CU-E02</span></div>
+    <div class="model" id="precios-model"></div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">Recomendación de precio por variedad</div>
+        <div class="table-wrap"><table id="precios-table"><thead><tr>
+          <th>Variedad</th><th>Demanda</th><th>Actual</th><th>Recomendado</th><th>Ajuste</th><th>Acción</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="panel"><div class="panel-title">Demanda por mercado (nº reseñas)</div>
+        <div class="chart-wrap"><canvas id="c-demanda"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- ANOMALIAS -->
+  <section class="persp">
+    <div class="persp-title"><h2>📡 Detección de Anomalías</h2><span class="cu">CU-E04 · CU-O13</span></div>
+    <div class="model" id="anom-model"></div>
+    <div id="anom-banner" class="anom-banner">Analizando…</div>
+    <div id="anom-pills" style="margin-bottom:14px;"></div>
+    <div class="grid2" id="anom-charts"></div>
+  </section>
+</div>
+
+<div id="toast-wrap"></div>
+
+<script>
+const PALETTE=['#d97a98','#c9933a','#4ade80','#f87171','#60a5fa','#a78bfa','#34d399','#fb923c','#e879f9','#22d3ee'];
+Chart.defaults.color='#7a6872';Chart.defaults.borderColor='rgba(255,255,255,0.06)';
+const GRID='rgba(155,31,66,.08)';const charts={};
+function toast(m,t='info'){const e=document.createElement('div');e.className='toast '+t;e.textContent=m;
+  document.getElementById('toast-wrap').appendChild(e);setTimeout(()=>e.remove(),4000);}
+const fmt=n=>Number(n).toLocaleString('es-MX');
+function destroy(k){if(charts[k]){charts[k].destroy();delete charts[k];}}
+function base(x={}){return{responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#7a6872',boxWidth:12,font:{size:11}}}},...x};}
+
+/* ── CHURN ── */
+async function loadChurn(){
+  const d=await (await fetch('/api/ml/churn')).json();
+  if(!d.disponible){document.getElementById('churn-cards').innerHTML='<div class="empty">Sin datos. Genera el Balanced Scorecard primero.</div>';return;}
+  document.getElementById('churn-model').textContent='Modelo: '+d.modelo;
+  const di=d.distribucion;
+  document.getElementById('churn-cards').innerHTML=`
+    <div class="card"><div class="lbl">Clientes analizados</div><div class="val">${fmt(d.total_clientes)}</div><div class="vsub">cartera activa</div></div>
+    <div class="card"><div class="lbl">Riesgo alto</div><div class="val" style="color:#f87171">${di.Alto}</div><div class="vsub">acción inmediata</div></div>
+    <div class="card"><div class="lbl">Riesgo promedio</div><div class="val" style="color:#e3a93f">${d.riesgo_promedio}%</div><div class="vsub">probabilidad media</div></div>
+    <div class="card"><div class="lbl">Ingresos en riesgo</div><div class="val" style="color:#5fd896">$${fmt(d.ingresos_en_riesgo)}</div><div class="vsub">LTV de cuentas Alto</div></div>`;
+  destroy('c-churn-dist');
+  charts['c-churn-dist']=new Chart(document.getElementById('c-churn-dist'),{type:'doughnut',
+    data:{labels:['Alto','Medio','Bajo'],datasets:[{data:[di.Alto,di.Medio,di.Bajo],
+      backgroundColor:['#ef4444cc','#d4870fcc','#22a35fcc'],borderColor:'#0d0810',borderWidth:2}]},
+    options:base({cutout:'58%',plugins:{legend:{position:'right',labels:{color:'#7a6872',boxWidth:12}}}})});
+  const cls={Alto:'b-alto',Medio:'b-medio',Bajo:'b-bajo'};
+  const col={Alto:'#f87171',Medio:'#e3a93f',Bajo:'#5fd896'};
+  document.querySelector('#churn-table tbody').innerHTML=d.cuentas_riesgo.map(c=>`
+    <tr><td>${c.cliente}</td><td>${c.pais}</td><td>${c.plan}</td>
+      <td><span class="badge ${cls[c.nivel]}">${c.nivel}</span></td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="bar"><i style="width:${c.probabilidad}%;background:${col[c.nivel]}"></i></div><span style="font-size:.72rem">${c.probabilidad}%</span></div></td>
+      <td style="color:var(--muted)">${c.factor}</td><td style="font-size:.74rem">${c.accion}</td></tr>`).join('');
+}
+
+/* ── SEGMENTACION ── */
+async function loadSeg(){
+  const d=await (await fetch('/api/ml/segmentacion')).json();
+  if(!d.disponible){document.getElementById('seg-grid').innerHTML='<div class="empty">Sin datos.</div>';return;}
+  document.getElementById('seg-model').textContent='Modelo: '+d.modelo+' · '+fmt(d.total_clientes)+' clientes';
+  const labels=d.segmentos.map(s=>s.segmento);
+  destroy('c-seg');
+  charts['c-seg']=new Chart(document.getElementById('c-seg'),{type:'bar',
+    data:{labels,datasets:[{data:d.segmentos.map(s=>s.clientes),backgroundColor:PALETTE.map(c=>c+'cc'),borderRadius:5}]},
+    options:base({indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:GRID},beginAtZero:true},y:{grid:{display:false},ticks:{font:{size:10}}}}})});
+  destroy('c-seg-ltv');
+  charts['c-seg-ltv']=new Chart(document.getElementById('c-seg-ltv'),{type:'bar',
+    data:{labels,datasets:[{data:d.segmentos.map(s=>s.ltv_total),backgroundColor:PALETTE[1]+'cc',borderRadius:5}]},
+    options:base({plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:40}},y:{grid:{color:GRID},beginAtZero:true}}})});
+  document.getElementById('seg-grid').innerHTML=d.segmentos.map((s,i)=>`
+    <div class="seg" style="border-left:3px solid ${PALETTE[i%PALETTE.length]}">
+      <h3>${s.segmento}</h3><div class="n">${s.clientes}</div>
+      <div class="est">${s.estrategia}</div>
+      <div style="font-size:.72rem;color:var(--muted)">LTV prom: $${fmt(s.ltv_promedio)}</div>
+      <div class="ej">${s.ejemplos.map(e=>e.cliente).join(' · ')}</div></div>`).join('');
+}
+
+/* ── PRECIOS ── */
+async function loadPrecios(){
+  const d=await (await fetch('/api/ml/precios')).json();
+  if(!d.disponible){return;}
+  document.getElementById('precios-model').textContent='Modelo: '+d.modelo;
+  const col=a=>a>3?'#5fd896':(a<-3?'#f87171':'#e3a93f');
+  document.querySelector('#precios-table tbody').innerHTML=d.recomendaciones.map(r=>`
+    <tr><td>${r.variedad}</td><td>${fmt(r.demanda)}</td><td>$${r.precio_actual}</td>
+      <td style="font-weight:700;color:var(--gold)">$${r.precio_recomendado}</td>
+      <td style="color:${col(r.ajuste_pct)}">${r.ajuste_pct>0?'+':''}${r.ajuste_pct}%</td>
+      <td style="font-size:.74rem">${r.accion}</td></tr>`).join('');
+  const m=d.mercados||[];
+  destroy('c-demanda');
+  charts['c-demanda']=new Chart(document.getElementById('c-demanda'),{type:'bar',
+    data:{labels:m.map(x=>x.pais),datasets:[{data:m.map(x=>x.demanda),backgroundColor:PALETTE[4]+'cc',borderRadius:5}]},
+    options:base({plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:40}},y:{grid:{color:GRID},beginAtZero:true}}})});
+}
+
+/* ── ANOMALIAS ── */
+async function loadAnom(){
+  const d=await (await fetch('/api/ml/anomalias')).json();
+  const banner=document.getElementById('anom-banner');
+  if(!d.disponible){banner.textContent='Sin datos.';return;}
+  document.getElementById('anom-model').textContent='Modelo: '+d.modelo;
+  const n=d.anomalias.length;
+  banner.className='anom-banner '+(n?'anom-bad':'anom-ok');
+  banner.textContent=(n?'⚠️ ':'✅ ')+d.estado+(n?` — ${n} evento(s) detectado(s)`:'');
+  document.getElementById('anom-pills').innerHTML=d.anomalias.map(a=>
+    `<span class="pill">${a.serie} · ${a.periodo} · ${a.tipo} (z=${a.z})</span>`).join('');
+  const cont=document.getElementById('anom-charts');cont.innerHTML='';
+  d.series.forEach((s,i)=>{
+    const id='c-anom-'+i;
+    cont.insertAdjacentHTML('beforeend',
+      `<div class="panel"><div class="panel-title">${s.etiqueta} <span style="color:var(--muted);font-weight:400">(media ${fmt(s.media)}${s.unidad})</span></div><div class="chart-wrap"><canvas id="${id}"></canvas></div></div>`);
+    destroy(id);
+    charts[id]=new Chart(document.getElementById(id),{type:'line',
+      data:{labels:s.puntos.map(p=>p.periodo),datasets:[{label:s.etiqueta,data:s.puntos.map(p=>p.valor),
+        borderColor:PALETTE[i%PALETTE.length],backgroundColor:PALETTE[i%PALETTE.length]+'18',fill:true,tension:.3,
+        borderWidth:2,pointRadius:s.puntos.map(p=>p.anomalia?6:0),
+        pointBackgroundColor:s.puntos.map(p=>p.anomalia?'#ef4444':'transparent'),
+        pointBorderColor:s.puntos.map(p=>p.anomalia?'#fff':'transparent')}]},
+      options:base({plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:8},maxRotation:60}},y:{grid:{color:GRID}}}})});
+  });
+}
+
+async function loadAll(){
+  try{await Promise.all([loadChurn(),loadSeg(),loadPrecios(),loadAnom()]);}
+  catch(e){toast('Error: '+e.message,'error');}
+}
+loadAll();
+</script>
+</body>
+</html>

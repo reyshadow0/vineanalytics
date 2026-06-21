@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>API Pública v1 — VinAnalytics Group</title>
+  <style>
+    :root{
+      --bg:#060305;--glass:rgba(255,255,255,0.035);--border:rgba(180,48,78,0.2);
+      --border-s:rgba(255,255,255,0.06);--accent:#9b1f42;--accent2:#d97a98;--gold:#c9933a;
+      --verde:#22a35f;--text:#f5eef0;--muted:#7a6872;--radius:18px;--radius-s:10px;
+      --get:#4ade80;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    :root{color-scheme:dark;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+      background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
+    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:radial-gradient(ellipse 80% 40% at 5% 0%,rgba(155,31,66,.12) 0%,transparent 60%),
+                 radial-gradient(ellipse 60% 50% at 95% 100%,rgba(201,147,58,.08) 0%,transparent 60%);}
+    a{color:var(--accent2);text-decoration:none;}
+    .navbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;
+      padding:0 28px;height:62px;background:rgba(10,5,8,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);}
+    .navbar-logo{display:flex;align-items:center;gap:10px;font-size:1.1rem;font-weight:800;color:var(--text);}
+    .logo-icon{font-size:1.4rem;}.logo-name span{color:var(--gold);}
+    .logo-group{font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;display:block;margin-top:-3px;}
+    .navbar-sep{width:1px;height:22px;background:var(--border);}
+    .navbar-title{font-size:.82rem;color:var(--muted);}
+    .navbar-right{display:flex;gap:14px;}.navbar-right a{color:#ccc;font-size:13px;}
+    .main{max-width:1080px;margin:0 auto;padding:28px;position:relative;z-index:1;}
+    h1{font-size:1.6rem;font-weight:800;margin-bottom:6px;}h1 span{color:var(--gold);}
+    .lead{color:var(--muted);margin-bottom:8px;}
+    .pill{display:inline-block;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:99px;
+      background:rgba(34,163,95,.14);color:#5fd896;border:1px solid rgba(34,163,95,.3);margin-right:6px;}
+    h2{font-size:1.05rem;font-weight:800;margin:30px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+    .card{background:var(--glass);border:1px solid var(--border-s);border-radius:var(--radius);padding:20px;margin-bottom:14px;backdrop-filter:blur(8px);}
+    code,.mono{font-family:'Courier New',Consolas,monospace;}
+    code{background:rgba(0,0,0,.4);padding:2px 7px;border-radius:5px;color:var(--gold);font-size:.86rem;}
+    pre{background:rgba(0,0,0,.55);border:1px solid var(--border-s);border-radius:var(--radius-s);
+      padding:14px 16px;overflow-x:auto;font-size:.8rem;color:#86efac;white-space:pre;margin:8px 0;}
+    .ep{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+    .method{font-size:.7rem;font-weight:800;padding:3px 10px;border-radius:6px;background:rgba(74,222,128,.15);color:var(--get);border:1px solid rgba(74,222,128,.3);}
+    .path{font-family:'Courier New',monospace;font-weight:700;font-size:.92rem;}
+    .lock{font-size:.66rem;color:var(--gold);border:1px solid rgba(201,147,58,.3);padding:1px 7px;border-radius:5px;}
+    .open{font-size:.66rem;color:#60a5fa;border:1px solid rgba(96,165,250,.3);padding:1px 7px;border-radius:5px;}
+    table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:8px;}
+    th{text-align:left;padding:8px 10px;color:var(--gold);font-size:.66rem;text-transform:uppercase;border-bottom:1px solid var(--border);}
+    td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04);}
+    .key-row{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border:1px solid var(--border-s);border-radius:var(--radius-s);margin-bottom:8px;}
+    .key-row code{font-size:.8rem;}
+    .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:var(--radius-s);
+      font-size:.84rem;font-weight:700;cursor:pointer;border:none;background:linear-gradient(135deg,var(--gold),#a86e1e);color:#fff;}
+    .btn:hover{filter:brightness(1.1);}
+    select,input{padding:9px 12px;border-radius:var(--radius-s);background:#140d17;border:1px solid var(--border-s);color:var(--text);font-size:.84rem;}
+    .try-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+    .resp{background:rgba(0,0,0,.6);border:1px solid var(--border-s);border-radius:var(--radius-s);
+      padding:14px;font-family:'Courier New',monospace;font-size:.78rem;color:#9be7ff;white-space:pre-wrap;max-height:340px;overflow:auto;}
+    .ok{color:#5fd896;}.bad{color:#f87171;}
+  </style>
+</head>
+<body>
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div class="navbar-logo"><span class="logo-icon">🍷</span>
+      <div class="logo-name">Vin<span>Analytics</span><span class="logo-group">Group</span></div></div>
+    <div class="navbar-sep"></div><span class="navbar-title">API Pública · Developer Portal</span>
+  </div>
+  <div class="navbar-right">
+    <a href="/">← Inicio</a><a href="/dashboard">Dashboard</a>
+    <a href="/balanced-scorecard">BSC</a><a href="/inteligencia">IA / ML</a>
+  </div>
+</nav>
+
+<div class="main">
+  <span class="pill">v1.0 · estable</span><span class="pill">OpenAPI 3.0 · SDD</span>
+  <h1>VinAnalytics <span>Public API</span></h1>
+  <p class="lead">Escalabilidad comercial por ecosistemas (OE2). Marketplaces, distribuidores e integradores
+     consumen la inteligencia vitivinícola directamente desde sus plataformas. Diseñada bajo
+     <strong>Specification-Driven Development</strong> — contrato en
+     <a href="/api/v1/openapi.json" target="_blank">/api/v1/openapi.json</a>.</p>
+
+  <h2>🔑 Autenticación</h2>
+  <div class="card">
+    <p>Todas las solicitudes (excepto <code>/health</code>) requieren una <strong>API key</strong> en el header
+       <code>X-API-Key</code> (o el parámetro <code>?api_key=</code>). Límite de tasa:
+       <strong>{{ rate_limit }} solicitudes/minuto</strong> por key.</p>
+    <pre>curl -H "X-API-Key: {{ demo_key }}" \
+     "{{ request.host_url }}api/v1/mercados"</pre>
+    <h3 style="font-size:.8rem;color:var(--muted);text-transform:uppercase;margin:14px 0 8px;">Keys de demostración</h3>
+    {% for key, partner in api_keys.items() %}
+      <div class="key-row"><span>{{ partner }}</span><code>{{ key }}</code></div>
+    {% endfor %}
+  </div>
+
+  <h2>🧭 Endpoints</h2>
+  <div class="card">
+    <div class="ep"><span class="method">GET</span><span class="path">/api/v1/health</span><span class="open">público</span></div>
+    <p style="color:var(--muted)">Estado del servicio y nº total de reseñas disponibles.</p>
+  </div>
+  <div class="card">
+    <div class="ep"><span class="method">GET</span><span class="path">/api/v1/vinos</span><span class="lock">🔒 API key</span></div>
+    <p style="color:var(--muted)">Catálogo de vinos paginado con filtros.</p>
+    <table><thead><tr><th>Parámetro</th><th>Tipo</th><th>Descripción</th></tr></thead><tbody>
+      <tr><td><code>page</code></td><td>int</td><td>Página (default 1)</td></tr>
+      <tr><td><code>per_page</code></td><td>int</td><td>Tamaño (máx 100)</td></tr>
+      <tr><td><code>pais</code></td><td>string</td><td>Filtrar por país</td></tr>
+      <tr><td><code>variedad</code></td><td>string</td><td>Filtrar por variedad</td></tr>
+      <tr><td><code>puntos_min</code></td><td>int</td><td>Puntuación mínima</td></tr>
+    </tbody></table>
+  </div>
+  <div class="card">
+    <div class="ep"><span class="method">GET</span><span class="path">/api/v1/mercados</span><span class="lock">🔒 API key</span></div>
+    <p style="color:var(--muted)">Indicadores agregados por mercado (reseñas, puntuación y precio promedio).</p>
+  </div>
+  <div class="card">
+    <div class="ep"><span class="method">GET</span><span class="path">/api/v1/precios</span><span class="lock">🔒 API key</span></div>
+    <p style="color:var(--muted)">Recomendaciones de precio dinámico por variedad (modelo de IA).</p>
+  </div>
+  <div class="card">
+    <div class="ep"><span class="method">GET</span><span class="path">/api/v1/scorecard</span><span class="lock">🔒 API key</span></div>
+    <p style="color:var(--muted)">Resumen ejecutivo del Balanced Scorecard (MRR, churn, uptime, clientes activos).</p>
+  </div>
+
+  <h2>▶️ Probador en vivo</h2>
+  <div class="card">
+    <div class="try-row">
+      <select id="t-ep">
+        <option value="/api/v1/health">GET /health</option>
+        <option value="/api/v1/vinos?per_page=3">GET /vinos?per_page=3</option>
+        <option value="/api/v1/mercados">GET /mercados</option>
+        <option value="/api/v1/precios">GET /precios</option>
+        <option value="/api/v1/scorecard">GET /scorecard</option>
+      </select>
+      <input id="t-key" value="{{ demo_key }}" style="flex:1;min-width:200px;" placeholder="X-API-Key"/>
+      <button class="btn" onclick="tryIt()">Enviar solicitud</button>
+    </div>
+    <div id="t-status" style="font-size:.8rem;margin-bottom:8px;color:var(--muted)">Listo.</div>
+    <div class="resp" id="t-resp">// La respuesta JSON aparecerá aquí…</div>
+  </div>
+</div>
+
+<script>
+async function tryIt(){
+  const ep=document.getElementById('t-ep').value;
+  const key=document.getElementById('t-key').value.trim();
+  const st=document.getElementById('t-status');
+  const out=document.getElementById('t-resp');
+  st.textContent='Enviando…';
+  const t0=performance.now();
+  try{
+    const r=await fetch(ep,{headers:key?{'X-API-Key':key}:{}});
+    const ms=(performance.now()-t0).toFixed(0);
+    const j=await r.json();
+    st.innerHTML=`<span class="${r.ok?'ok':'bad'}">HTTP ${r.status}</span> · ${ms} ms`;
+    out.textContent=JSON.stringify(j,null,2);
+  }catch(e){st.innerHTML='<span class="bad">Error</span>';out.textContent=e.message;}
+}
+tryIt();
+</script>
+</body>
+</html>

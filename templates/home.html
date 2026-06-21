@@ -175,6 +175,8 @@
       {% if session.username %}
         <span class="user-chip">👤 {{ session.username }}</span>
         <a href="/logout" class="hbtn">Salir</a>
+        <a href="/balanced-scorecard" class="hbtn" style="background:var(--gold);color:var(--wine-dark);border-color:var(--gold);">★ Balanced Scorecard</a>
+        <a href="/inteligencia" class="hbtn">🤖 IA / ML</a>
         {% if session.rol == 'admin' %}
           <a href="/admin"     class="hbtn wine">⚙️ Administración</a>
         {% else %}
@@ -194,7 +196,7 @@
     <div class="hero-left">
       <div class="hero-eyebrow">Plataforma de Inteligencia Vitivinícola · 44 países</div>
       <h1 class="hero-title">Descubre el vino<br>que <em>te mereces.</em></h1>
-      <p class="hero-subtitle">Más de 308,000 reseñas de vinos de todo el mundo. Filtra por país, variedad, bodega, puntuación y precio — todo en tiempo real.</p>
+      <p class="hero-subtitle">Más de 508,000 reseñas de vinos de todo el mundo. Filtra por país, variedad, bodega, puntuación y precio — todo en tiempo real.</p>
       <div class="hero-search">
         <input type="text" id="hero-search" placeholder="Buscar vino, bodega o variedad...">
         <button onclick="doSearch()">🔍</button>
@@ -208,10 +210,10 @@
         <span class="hint" onclick="searchHint('Argentina')">Argentina</span>
       </div>
       <div class="hero-stats">
-        <div class="hstat"><strong>308,724</strong><span>Reseñas</span></div>
-        <div class="hstat"><strong>44</strong><span>Países</span></div>
-        <div class="hstat"><strong>708</strong><span>Variedades</span></div>
-        <div class="hstat"><strong>16,756</strong><span>Bodegas</span></div>
+        <div class="hstat"><strong id="stat-resenas">—</strong><span>Reseñas</span></div>
+        <div class="hstat"><strong id="stat-paises">—</strong><span>Países</span></div>
+        <div class="hstat"><strong id="stat-variedades">—</strong><span>Variedades</span></div>
+        <div class="hstat"><strong id="stat-bodegas">—</strong><span>Bodegas</span></div>
       </div>
     </div>
 
@@ -410,6 +412,18 @@ document.getElementById('hero-search').addEventListener('keydown', e => { if (e.
 
 loadCards('top-cards',    '/api/resenas?per_page=4&puntos_min=95', 'Top Rated');
 loadCards('recent-cards', '/api/resenas?per_page=4&puntos_min=88', null);
+
+async function loadStats() {
+  try {
+    const kpis = await fetch('/api/kpis').then(r => r.json());
+    const fmt = n => Number(n).toLocaleString('es-MX');
+    if (kpis.total_resenas   != null) document.getElementById('stat-resenas').textContent   = fmt(kpis.total_resenas);
+    if (kpis.total_paises    != null) document.getElementById('stat-paises').textContent    = fmt(kpis.total_paises);
+    if (kpis.total_variedades != null) document.getElementById('stat-variedades').textContent = fmt(kpis.total_variedades);
+    if (kpis.total_bodegas   != null) document.getElementById('stat-bodegas').textContent   = fmt(kpis.total_bodegas);
+  } catch (_) {}
+}
+loadStats();
 
 /* ═══════════════════════════════════════════════
    INTERSECTION OBSERVERS

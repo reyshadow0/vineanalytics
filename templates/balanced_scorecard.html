@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Balanced Scorecard — VinAnalytics Group</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:#060305; --card:#0d0810; --glass:rgba(255,255,255,0.035);
+      --border:rgba(180,48,78,0.2); --border-s:rgba(255,255,255,0.06);
+      --accent:#9b1f42; --accent2:#d97a98; --gold:#c9933a;
+      --verde:#22a35f; --amarillo:#d4870f; --rojo:#ef4444;
+      --text:#f5eef0; --muted:#7a6872; --radius:18px; --radius-s:10px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    :root{color-scheme:dark;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+      background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;}
+    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:radial-gradient(ellipse 80% 40% at 5% 0%,rgba(155,31,66,.12) 0%,transparent 60%),
+                 radial-gradient(ellipse 60% 50% at 95% 100%,rgba(201,147,58,.08) 0%,transparent 60%);}
+    a{color:inherit;text-decoration:none;}
+
+    /* Navbar */
+    .navbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;
+      padding:0 28px;height:62px;background:rgba(10,5,8,.92);backdrop-filter:blur(20px);
+      border-bottom:1px solid var(--border);}
+    .navbar-logo{display:flex;align-items:center;gap:10px;font-size:1.1rem;font-weight:800;}
+    .logo-icon{font-size:1.4rem;filter:drop-shadow(0 0 10px rgba(201,147,58,.5));}
+    .logo-name span{color:var(--gold);}
+    .logo-group{font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.15em;
+      text-transform:uppercase;display:block;margin-top:-3px;}
+    .navbar-sep{width:1px;height:22px;background:var(--border);}
+    .navbar-title{font-size:.82rem;color:var(--muted);font-weight:500;}
+    .navbar-right{display:flex;align-items:center;gap:14px;}
+    .navbar-right a{color:#ccc;font-size:13px;}
+    .navbar-right a:hover{color:var(--gold);}
+    .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:var(--radius-s);
+      font-size:.82rem;font-weight:600;cursor:pointer;border:none;transition:all .2s;}
+    .btn-gold{background:linear-gradient(135deg,var(--gold),#a86e1e);color:#fff;}
+    .btn-gold:hover{filter:brightness(1.12);}
+    .btn-outline{background:transparent;color:var(--accent2);border:1px solid rgba(217,122,152,.4);}
+    .btn-outline:hover{background:rgba(155,31,66,.12);}
+    .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.25);
+      border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;}
+    @keyframes sp{to{transform:rotate(360deg);}}
+
+    .main{max-width:1440px;margin:0 auto;padding:24px 28px;position:relative;z-index:1;}
+
+    /* Header */
+    .bsc-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:8px;}
+    .bsc-head h1{font-size:1.5rem;font-weight:800;}
+    .bsc-head h1 span{color:var(--gold);}
+    .bsc-head .sub{font-size:.85rem;color:var(--muted);margin-top:4px;}
+    .periodo-badge{padding:5px 12px;border-radius:99px;background:rgba(201,147,58,.12);
+      color:var(--gold);font-weight:700;font-size:.78rem;border:1px solid rgba(201,147,58,.3);}
+    .head-actions{display:flex;gap:10px;flex-wrap:wrap;}
+
+    /* Banner sin datos */
+    .empty-banner{margin:18px 0;padding:18px 22px;border-radius:var(--radius);
+      background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);
+      display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+
+    /* Mapa estratégico */
+    .map{margin:22px 0 30px;display:flex;flex-direction:column;gap:6px;}
+    .map-band{border-radius:var(--radius-s);padding:13px 18px;border:1px solid var(--border-s);
+      background:var(--glass);display:flex;align-items:center;gap:14px;}
+    .map-band .tag{font-size:.66rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+      padding:4px 10px;border-radius:6px;white-space:nowrap;}
+    .map-band .desc{font-size:.8rem;color:var(--muted);}
+    .map-band.fin .tag{background:rgba(34,163,95,.16);color:#4ade80;}
+    .map-band.cli .tag{background:rgba(217,122,152,.16);color:var(--accent2);}
+    .map-band.pro .tag{background:rgba(201,147,58,.16);color:var(--gold);}
+    .map-band.apr .tag{background:rgba(96,165,250,.16);color:#60a5fa;}
+    .map-arrow{text-align:center;color:var(--muted);font-size:.8rem;}
+
+    /* Perspectiva */
+    .persp{margin-bottom:34px;}
+    .persp-title{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+    .persp-title h2{font-size:1.05rem;font-weight:800;}
+    .persp-title .oe{font-size:.66rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.08em;padding:3px 9px;border-radius:6px;border:1px solid var(--border-s);background:var(--glass);}
+    .persp-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+    /* KPI cards */
+    .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin-bottom:18px;}
+    @media(max-width:1100px){.kpi-row{grid-template-columns:repeat(3,1fr);}}
+    @media(max-width:640px){.kpi-row{grid-template-columns:repeat(2,1fr);}}
+    .kpi{background:var(--glass);border:1px solid var(--border-s);border-radius:var(--radius);
+      padding:16px 16px 14px;position:relative;overflow:hidden;backdrop-filter:blur(8px);}
+    .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+    .kpi.verde::before{background:var(--verde);}
+    .kpi.amarillo::before{background:var(--amarillo);}
+    .kpi.rojo::before{background:var(--rojo);}
+    .kpi-top{display:flex;align-items:center;gap:7px;margin-bottom:9px;}
+    .kpi-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+    .verde .kpi-dot{background:var(--verde);box-shadow:0 0 7px var(--verde);}
+    .amarillo .kpi-dot{background:var(--amarillo);box-shadow:0 0 7px var(--amarillo);}
+    .rojo .kpi-dot{background:var(--rojo);box-shadow:0 0 7px var(--rojo);}
+    .kpi-name{font-size:.72rem;font-weight:700;color:var(--text);line-height:1.25;}
+    .kpi-value{font-size:1.7rem;font-weight:800;line-height:1.1;}
+    .kpi-value .unit{font-size:.9rem;color:var(--muted);font-weight:600;margin-left:2px;}
+    .verde .kpi-value{color:#5fd896;}
+    .amarillo .kpi-value{color:#e3a93f;}
+    .rojo .kpi-value{color:#f87171;}
+    .kpi-meta{font-size:.68rem;color:var(--muted);font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:.04em;}
+    .kpi-sub{font-size:.7rem;color:var(--muted);margin-top:2px;}
+
+    /* Charts */
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    @media(max-width:900px){.charts{grid-template-columns:1fr;}}
+    .chart-card{background:var(--glass);border:1px solid var(--border-s);border-radius:var(--radius);
+      padding:20px;backdrop-filter:blur(8px);}
+    .chart-card.wide{grid-column:1 / -1;}
+    .chart-title{font-size:.85rem;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+    .chart-title .cu{margin-left:auto;font-size:.62rem;font-weight:700;color:var(--muted);
+      padding:2px 8px;border-radius:5px;border:1px solid var(--border-s);}
+    .chart-wrap{position:relative;height:260px;}
+
+    #toast-wrap{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px;}
+    .toast{padding:12px 18px;border-radius:var(--radius-s);font-size:.85rem;font-weight:600;color:#fff;
+      box-shadow:0 4px 24px rgba(0,0,0,.6);}
+    .toast.success{background:rgba(34,163,95,.9);}
+    .toast.error{background:rgba(239,68,68,.9);}
+    .toast.info{background:rgba(155,31,66,.9);}
+
+    @media print{
+      .navbar,.head-actions,#toast-wrap{display:none;}
+      body::before{display:none;}
+      .kpi,.chart-card,.map-band{break-inside:avoid;}
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div class="navbar-logo">
+      <span class="logo-icon">🍷</span>
+      <div class="logo-name">Vin<span>Analytics</span><span class="logo-group">Group</span></div>
+    </div>
+    <div class="navbar-sep"></div>
+    <span class="navbar-title">Balanced Scorecard Corporativo</span>
+  </div>
+  <div class="navbar-right">
+    <a href="/">← Inicio</a>
+    <a href="/dashboard">Dashboard BI</a>
+    <a href="/inteligencia">IA / ML</a>
+    <a href="/api-docs">API</a>
+    {% if show_admin %}<a href="/admin">Administración</a>{% endif %}
+  </div>
+</nav>
+
+<div class="main">
+
+  <div class="bsc-head">
+    <div>
+      <h1>Cuadro de Mando Integral — <span>VinAnalytics</span></h1>
+      <div class="sub">Mapa estratégico y KPIs de las cuatro perspectivas · CU-E01 a CU-E08</div>
+    </div>
+    <div class="head-actions">
+      <span class="periodo-badge" id="periodo-badge">Periodo —</span>
+      <button class="btn btn-outline" onclick="window.print()">🖨 Reporte ejecutivo</button>
+      <button class="btn btn-outline" id="btn-refresh" onclick="loadAll()">↻ Actualizar</button>
+      {% if show_admin %}
+      <button class="btn btn-gold" id="btn-gen" onclick="generarBSC()">⚙ Generar/actualizar datos</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div id="empty-banner" class="empty-banner" style="display:none;">
+    <div>⚠ Aún no hay datos de negocio cargados en el Balanced Scorecard.</div>
+    {% if show_admin %}
+      <button class="btn btn-gold" onclick="generarBSC()">⚙ Generar datos sintéticos ahora</button>
+    {% else %}
+      <div style="color:var(--muted);font-size:.8rem;">Pide a un administrador que ejecute la generación de datos.</div>
+    {% endif %}
+  </div>
+
+  <!-- Mapa estratégico (lectura ascendente) -->
+  <div class="map" id="map">
+    <div class="map-band fin">
+      <span class="tag">Financiera · OE1·OE2</span>
+      <span class="desc">Incrementar MRR/ARR · elevar ingresos vía API · reducir CAC · mejorar LTV/CAC · optimizar costo cloud</span>
+    </div>
+    <div class="map-arrow">▲</div>
+    <div class="map-band cli">
+      <span class="tag">Cliente · OE1</span>
+      <span class="desc">Captar nuevos mercados · mejorar conversión · reducir churn · elevar NPS y adopción</span>
+    </div>
+    <div class="map-arrow">▲</div>
+    <div class="map-band pro">
+      <span class="tag">Procesos internos · OE2·OE3</span>
+      <span class="desc">Uptime &gt; 99.9 % · time-to-market &lt; 1 día · APIs estandarizadas (SDD) · calidad del Data Warehouse</span>
+    </div>
+    <div class="map-arrow">▲</div>
+    <div class="map-band apr">
+      <span class="tag">Aprendizaje y crecimiento · OE4</span>
+      <span class="desc">Capacitar al equipo · cultura data-driven · adoptar ML/AutoML · retener talento técnico</span>
+    </div>
+  </div>
+
+  <!-- FINANCIERA -->
+  <section class="persp">
+    <div class="persp-title"><h2>💰 Perspectiva Financiera</h2><span class="oe">Resultado de OE1 · OE2</span></div>
+    <div class="kpi-row" id="kpis-financiera"></div>
+    <div class="charts">
+      <div class="chart-card">
+        <div class="chart-title">📈 Evolución de ingresos: MRR vs API <span class="cu">CU-E02</span></div>
+        <div class="chart-wrap"><canvas id="c-mrr"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🥧 MRR por plan de suscripción <span class="cu">CU-E02</span></div>
+        <div class="chart-wrap"><canvas id="c-plan"></canvas></div>
+      </div>
+      <div class="chart-card wide">
+        <div class="chart-title">📉 CAC internacional — tendencia mensual <span class="cu">CU-E03</span></div>
+        <div class="chart-wrap"><canvas id="c-cac"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLIENTE -->
+  <section class="persp">
+    <div class="persp-title"><h2>🤝 Perspectiva del Cliente</h2><span class="oe">Habilita OE1</span></div>
+    <div class="kpi-row" id="kpis-cliente"></div>
+    <div class="charts">
+      <div class="chart-card">
+        <div class="chart-title">🌎 Nuevos clientes por mercado <span class="cu">CU-E03</span></div>
+        <div class="chart-wrap"><canvas id="c-mercado"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🔻 Embudo de conversión (mes) <span class="cu">CU-E03</span></div>
+        <div class="chart-wrap"><canvas id="c-embudo"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">📊 Conversión y NPS — mensual <span class="cu">CU-E05</span></div>
+        <div class="chart-wrap"><canvas id="c-convnps"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">📉 Tasa de churn — mensual <span class="cu">CU-E05</span></div>
+        <div class="chart-wrap"><canvas id="c-churn"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROCESOS -->
+  <section class="persp">
+    <div class="persp-title"><h2>⚙️ Perspectiva de Procesos Internos</h2><span class="oe">Habilita OE2 · OE3</span></div>
+    <div class="kpi-row" id="kpis-procesos"></div>
+    <div class="charts">
+      <div class="chart-card">
+        <div class="chart-title">🟢 Disponibilidad (Uptime) — mensual <span class="cu">CU-E04</span></div>
+        <div class="chart-wrap"><canvas id="c-uptime"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🌐 Latencia promedio por región <span class="cu">CU-E04</span></div>
+        <div class="chart-wrap"><canvas id="c-latencia"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🚀 Time-to-market — mensual (días) <span class="cu">CU-E04</span></div>
+        <div class="chart-wrap"><canvas id="c-ttm"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">⚠️ Incidentes de infraestructura — mensual <span class="cu">CU-E04</span></div>
+        <div class="chart-wrap"><canvas id="c-incidentes"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ECOSISTEMA / APRENDIZAJE -->
+  <section class="persp">
+    <div class="persp-title"><h2>🧠 Aprendizaje · Ecosistema de APIs</h2><span class="oe">OE4 · OE2</span></div>
+    <div class="kpi-row" id="kpis-aprendizaje"></div>
+    <div class="charts">
+      <div class="chart-card">
+        <div class="chart-title">🔌 Ingresos vía API por partner <span class="cu">CU-E06</span></div>
+        <div class="chart-wrap"><canvas id="c-partner-ing"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">📞 Llamadas a la API pública — mensual <span class="cu">CU-E06</span></div>
+        <div class="chart-wrap"><canvas id="c-llamadas"></canvas></div>
+      </div>
+      <div class="chart-card wide">
+        <div class="chart-title">🤝 Conexiones activas de partners <span class="cu">CU-E06</span></div>
+        <div class="chart-wrap"><canvas id="c-conexiones"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div id="toast-wrap"></div>
+
+<script>
+const PALETTE=['#d97a98','#c9933a','#4ade80','#f87171','#60a5fa','#a78bfa','#34d399','#fb923c','#e879f9','#22d3ee','#fbbf24','#a3e635'];
+Chart.defaults.color='#7a6872';
+Chart.defaults.borderColor='rgba(255,255,255,0.06)';
+Chart.defaults.font.family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+const GRID='rgba(155,31,66,.08)';
+const charts={};
+const busy={gen:false};
+
+function toast(msg,type='info'){
+  const el=document.createElement('div');
+  el.className='toast '+type;el.textContent=msg;
+  document.getElementById('toast-wrap').appendChild(el);
+  setTimeout(()=>el.remove(),4000);
+}
+const fmt=n=>Number(n).toLocaleString('es-MX');
+function destroy(k){if(charts[k]){charts[k].destroy();delete charts[k];}}
+function base(extra={}){return{responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#7a6872',boxWidth:12,font:{size:11}}}},...extra};}
+
+/* ── KPI cards ── */
+function renderKpis(containerId,kpis){
+  const el=document.getElementById(containerId);
+  el.innerHTML=kpis.map(k=>{
+    const metaTxt=(k.mejor==='mayor'?'Meta ≥ ':'Meta ≤ ')+fmt(k.meta)+(k.unidad||'');
+    const valTxt=fmt(k.valor)+(k.unidad?`<span class="unit">${k.unidad}</span>`:'');
+    return `<div class="kpi ${k.estado}">
+      <div class="kpi-top"><span class="kpi-dot"></span><span class="kpi-name">${k.etiqueta}</span></div>
+      <div class="kpi-value">${valTxt}</div>
+      <div class="kpi-meta">${metaTxt}</div>
+      <div class="kpi-sub">${k.sub||''}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadKpis(){
+  const d=await (await fetch('/api/bsc/kpis')).json();
+  if(d.error){toast('Error KPIs: '+d.error,'error');return false;}
+  if(!d.disponible){document.getElementById('empty-banner').style.display='flex';return false;}
+  document.getElementById('empty-banner').style.display='none';
+  document.getElementById('periodo-badge').textContent='Periodo '+d.periodo;
+  renderKpis('kpis-financiera',d.perspectivas.financiera);
+  renderKpis('kpis-cliente',d.perspectivas.cliente);
+  renderKpis('kpis-procesos',d.perspectivas.procesos);
+  renderKpis('kpis-aprendizaje',d.perspectivas.aprendizaje);
+  return true;
+}
+
+/* ── helpers de gráficas ── */
+const lbl=arr=>arr.map(p=>p[0]);
+const dat=arr=>arr.map(p=>p[1]);
+
+function lineChart(id,labels,datasets,yOpts={}){
+  destroy(id);
+  charts[id]=new Chart(document.getElementById(id),{type:'line',
+    data:{labels,datasets},
+    options:base({interaction:{mode:'index',intersect:false},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:60,font:{size:9}}},
+              y:{grid:{color:GRID},...yOpts}}})});
+}
+function barChart(id,labels,data,color,horizontal=false,yOpts={}){
+  destroy(id);
+  charts[id]=new Chart(document.getElementById(id),{type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:(Array.isArray(color)?color:color+'cc'),
+      borderColor:color,borderWidth:1,borderRadius:5}]},
+    options:base({indexAxis:horizontal?'y':'x',plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:GRID},...yOpts}}})});
+}
+
+async function loadSeries(){
+  const d=await (await fetch('/api/bsc/series')).json();
+  if(d.error||!d.disponible)return;
+  const f=d.financiera,c=d.cliente,p=d.procesos,e=d.ecosistema;
+
+  /* Financiera */
+  lineChart('c-mrr',lbl(f.mrr),[
+    {label:'MRR ($/mes)',data:dat(f.mrr),borderColor:PALETTE[2],backgroundColor:PALETTE[2]+'22',
+      fill:true,tension:.3,pointRadius:0,borderWidth:2},
+    {label:'Ingresos API ($/mes)',data:dat(f.api),borderColor:PALETTE[1],backgroundColor:PALETTE[1]+'22',
+      fill:true,tension:.3,pointRadius:0,borderWidth:2},
+  ]);
+  destroy('c-plan');
+  charts['c-plan']=new Chart(document.getElementById('c-plan'),{type:'doughnut',
+    data:{labels:lbl(f.por_plan),datasets:[{data:dat(f.por_plan),
+      backgroundColor:PALETTE,borderColor:'#0d0810',borderWidth:2}]},
+    options:base({cutout:'58%',plugins:{legend:{position:'right',labels:{color:'#7a6872',boxWidth:12,font:{size:11}}}}})});
+  lineChart('c-cac',lbl(f.cac),[
+    {label:'CAC ($)',data:dat(f.cac),borderColor:PALETTE[3],backgroundColor:PALETTE[3]+'18',
+      fill:true,tension:.3,pointRadius:0,borderWidth:2},
+    {label:'Meta ≤ $1200',data:dat(f.cac).map(()=>1200),borderColor:PALETTE[0],borderDash:[6,4],
+      pointRadius:0,borderWidth:1.5},
+  ]);
+
+  /* Cliente */
+  barChart('c-mercado',lbl(c.nuevos_mercado),dat(c.nuevos_mercado),PALETTE[0],true);
+  destroy('c-embudo');
+  charts['c-embudo']=new Chart(document.getElementById('c-embudo'),{type:'bar',
+    data:{labels:['Leads','Oportunidades','Conversiones'],
+      datasets:[{data:c.embudo,backgroundColor:[PALETTE[4]+'cc',PALETTE[1]+'cc',PALETTE[2]+'cc'],
+        borderColor:[PALETTE[4],PALETTE[1],PALETTE[2]],borderWidth:1,borderRadius:5}]},
+    options:base({plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:GRID},beginAtZero:true}}})});
+  lineChart('c-convnps',lbl(c.conversion),[
+    {label:'Conversión (%)',data:dat(c.conversion),borderColor:PALETTE[2],tension:.3,pointRadius:0,borderWidth:2,yAxisID:'y'},
+    {label:'NPS',data:dat(c.nps),borderColor:PALETTE[0],tension:.3,pointRadius:0,borderWidth:2,yAxisID:'y1'},
+  ]);
+  // segundo eje para NPS
+  charts['c-convnps'].options.scales.y1={position:'right',grid:{display:false}};
+  charts['c-convnps'].update();
+  lineChart('c-churn',lbl(c.churn),[
+    {label:'Churn (%)',data:dat(c.churn),borderColor:PALETTE[3],backgroundColor:PALETTE[3]+'18',
+      fill:true,tension:.3,pointRadius:0,borderWidth:2},
+    {label:'Meta ≤ 4%',data:dat(c.churn).map(()=>4),borderColor:PALETTE[1],borderDash:[6,4],pointRadius:0,borderWidth:1.5},
+  ],{beginAtZero:true});
+
+  /* Procesos */
+  lineChart('c-uptime',lbl(p.uptime),[
+    {label:'Uptime (%)',data:dat(p.uptime),borderColor:PALETTE[2],backgroundColor:PALETTE[2]+'18',
+      fill:true,tension:.3,pointRadius:0,borderWidth:2},
+    {label:'Meta 99.9%',data:dat(p.uptime).map(()=>99.9),borderColor:PALETTE[3],borderDash:[6,4],pointRadius:0,borderWidth:1.5},
+  ],{min:99.7,max:100});
+  barChart('c-latencia',lbl(p.latencia_region),dat(p.latencia_region),PALETTE[4],false,{beginAtZero:true});
+  lineChart('c-ttm',lbl(p.ttm),[
+    {label:'Días',data:dat(p.ttm),borderColor:PALETTE[1],backgroundColor:PALETTE[1]+'18',
+      fill:true,tension:.3,pointRadius:0,borderWidth:2},
+    {label:'Meta < 1 día',data:dat(p.ttm).map(()=>1),borderColor:PALETTE[3],borderDash:[6,4],pointRadius:0,borderWidth:1.5},
+  ],{beginAtZero:true});
+  barChart('c-incidentes',lbl(p.incidentes),dat(p.incidentes),PALETTE[5],false,{beginAtZero:true});
+
+  /* Ecosistema */
+  barChart('c-partner-ing',lbl(e.ingresos_partner),dat(e.ingresos_partner),PALETTE[1],true);
+  lineChart('c-llamadas',lbl(e.llamadas),[
+    {label:'Llamadas API',data:dat(e.llamadas),borderColor:PALETTE[4],backgroundColor:PALETTE[4]+'18',
+      fill:true,tension:.3,pointRadius:0,borderWidth:2},
+  ],{beginAtZero:true});
+  barChart('c-conexiones',lbl(e.conexiones_partner),dat(e.conexiones_partner),
+    PALETTE.slice(0,e.conexiones_partner.length).map(c=>c+'cc'),false,{beginAtZero:true});
+}
+
+async function loadAll(){
+  const ok=await loadKpis();
+  if(ok)await loadSeries();
+}
+
+async function generarBSC(){
+  if(busy.gen)return;
+  busy.gen=true;
+  const btns=document.querySelectorAll('#btn-gen, .empty-banner .btn-gold');
+  btns.forEach(b=>{b.disabled=true;});
+  toast('Generando datos del Balanced Scorecard…','info');
+  try{
+    const r=await fetch('/etl/generar-bsc',{method:'POST'});
+    const d=await r.json();
+    if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));
+    toast('Datos generados correctamente','success');
+    await loadAll();
+  }catch(err){toast('Error: '+err.message,'error');}
+  finally{busy.gen=false;btns.forEach(b=>{b.disabled=false;});}
+}
+
+loadAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import mysql.connector; from config import *; c=mysql.connector.connect\\(host=STARROCKS_HOST,port=STARROCKS_PORT,user=STARROCKS_USER,password=STARROCKS_PASS,connection_timeout=8\\); cur=c.cursor\\(\\); cur.execute\\('SHOW DATABASES'\\); print\\('DBs:', [r[0] for r in cur.fetchall\\(\\)]\\); cur.execute\\('USE '+STARROCKS_DB\\); cur.execute\\('SHOW TABLES'\\); print\\('TABLES:', [r[0] for r in cur.fetchall\\(\\)]\\); c.close\\(\\)\")",
+      "Bash(docker compose *)",
+      "Bash(python -c \"import mysql.connector; from config import *; c=mysql.connector.connect\\(host=STARROCKS_HOST,port=STARROCKS_PORT,user=STARROCKS_USER,password=STARROCKS_PASS,connection_timeout=10\\); cur=c.cursor\\(\\); cur.execute\\('USE '+STARROCKS_DB\\); cur.execute\\('SHOW TABLES'\\); print\\('TABLES:', [r[0] for r in cur.fetchall\\(\\)]\\); cur.execute\\('SELECT COUNT\\(*\\) FROM fact_resenas'\\); print\\('fact_resenas rows:', cur.fetchone\\(\\)[0]\\); c.close\\(\\)\")"
+    ]
+  }
+}

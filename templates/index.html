@@ -409,6 +409,9 @@
   </div>
   <div class="navbar-right">
     <a href="/" style="color:#ccc;text-decoration:none;font-size:13px;margin-right:12px;">← Inicio</a>
+    <a href="/balanced-scorecard" style="color:#c9933a;text-decoration:none;font-size:13px;margin-right:12px;font-weight:600;">★ Balanced Scorecard</a>
+    <a href="/inteligencia" style="color:#ccc;text-decoration:none;font-size:13px;margin-right:12px;">IA / ML</a>
+    <a href="/api-docs" style="color:#ccc;text-decoration:none;font-size:13px;margin-right:12px;">API</a>
     {% if show_admin %}
       <a href="/auditoria" style="color:#ccc;text-decoration:none;font-size:13px;margin-right:12px;">Auditoría</a>
       <a href="/usuarios"  style="color:#ccc;text-decoration:none;font-size:13px;margin-right:12px;">Usuarios</a>
@@ -659,13 +662,18 @@
     <div class="card">
       <div class="table-controls">
         <div class="table-info" id="table-info">Cargando datos...</div>
-        <div class="per-page-wrap">
-          Registros por página:
-          <select id="per-page" onchange="changePerPage()">
-            <option value="50">50</option>
-            <option value="100">100</option>
-            <option value="200">200</option>
-          </select>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="per-page-wrap">
+            Registros por página:
+            <select id="per-page" onchange="changePerPage()">
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
+          </div>
+          <button class="btn btn-outline" onclick="exportCSV()" title="Exporta hasta 10,000 filas con los filtros activos" style="font-size:.8rem;padding:7px 14px;">
+            ⬇ Exportar CSV
+          </button>
         </div>
       </div>
 
@@ -694,6 +702,73 @@
         <span class="page-info" id="page-info">—</span>
         <button class="page-btn" id="btn-next" onclick="changePage(1)">Siguiente →</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ── Comparar Mercados (OO1.2.1) ──────────────────────────────────── -->
+  <section>
+    <div class="section-title">Comparativa por Mercado — hasta 4 países</div>
+    <div class="card">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+        <div class="fg">
+          <label>País 1</label>
+          <select id="cmp-1"><option value="">— Seleccionar —</option></select>
+        </div>
+        <div class="fg">
+          <label>País 2</label>
+          <select id="cmp-2"><option value="">— Seleccionar —</option></select>
+        </div>
+        <div class="fg">
+          <label>País 3</label>
+          <select id="cmp-3"><option value="">— Seleccionar —</option></select>
+        </div>
+        <div class="fg">
+          <label>País 4 (opcional)</label>
+          <select id="cmp-4"><option value="">— Ninguno —</option></select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;">
+        <button class="btn btn-gold" onclick="loadComparacion()">📊 Comparar mercados</button>
+        <span id="cmp-status" style="font-size:.8rem;color:var(--muted);"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+        <div class="chart-card">
+          <div class="chart-title">⭐ Puntuación Promedio por País</div>
+          <div class="chart-wrap"><canvas id="chart-cmp-puntuacion"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">💰 Precio Promedio por País ($)</div>
+          <div class="chart-wrap"><canvas id="chart-cmp-precio"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">🍷 Total Reseñas por País</div>
+          <div class="chart-wrap"><canvas id="chart-cmp-resenas"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">🌿 Variedades Distintas por País</div>
+          <div class="chart-wrap"><canvas id="chart-cmp-variedades"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tendencias de Precio (OO1.2.2) ────────────────────────────────── -->
+  <section>
+    <div class="section-title">Tendencias de Precio por Variedad — Proyección con Regresión Lineal</div>
+    <div class="card">
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px;">
+        <div class="fg" style="flex:1;min-width:200px;">
+          <label>Variedad de uva</label>
+          <select id="trend-variedad">
+            <option value="">Todas las variedades</option>
+          </select>
+        </div>
+        <button class="btn btn-gold" onclick="loadTendencias()">📈 Analizar tendencia</button>
+      </div>
+      <div class="chart-wrap" style="height:340px;">
+        <canvas id="chart-tendencias"></canvas>
+      </div>
+      <div id="trend-meta" style="margin-top:14px;font-size:.82rem;color:var(--muted);text-align:center;padding:10px;background:rgba(201,147,58,.06);border-radius:8px;display:none;"></div>
     </div>
   </section>
 
@@ -806,6 +881,7 @@ async function etlAction(name) {
     addLog(`✓ Completado: ${label}\n${(data.log || 'OK').trim()}`);
     showToast(`${label} completado`, 'success');
     await checkEtlStatus();
+    if (name === 'starrocks') await reloadDashboard();
   } catch (err) {
     addLog(`✗ Error en ${label}: ${err.message}`);
     showToast(`Error: ${err.message}`, 'error');
@@ -1265,11 +1341,186 @@ document.getElementById('f-bodega')?.addEventListener('keydown', e => {
   });
 });
 
+/* ── Exportar CSV ─────────────────────────────────────────────────────── */
+function exportCSV() {
+  const params = new URLSearchParams({ limit: 10000, ...getFilters() });
+  window.location.href = `/api/export/csv?${params}`;
+  showToast('Generando CSV — la descarga comenzará en un momento', 'info');
+}
+
+/* ── Comparar Mercados ────────────────────────────────────────────────── */
+async function loadCountryOptions() {
+  try {
+    const rows = await fetch('/api/paises').then(r => r.json());
+    if (!rows.length) return;
+    const opts = rows.map(r => `<option value="${r.nombre}">${r.nombre} (${fmt(r.total)})</option>`).join('');
+    [1,2,3,4].forEach(i => {
+      const sel = document.getElementById(`cmp-${i}`);
+      if (!sel) return;
+      const placeholder = i === 4 ? '<option value="">— Ninguno —</option>' : '<option value="">— Seleccionar —</option>';
+      sel.innerHTML = placeholder + opts;
+    });
+    // pre-seleccionar los 3 mercados principales
+    const top = rows.slice(0, 4).map(r => r.nombre);
+    [1,2,3,4].forEach((i, idx) => {
+      const sel = document.getElementById(`cmp-${i}`);
+      if (sel && top[idx]) sel.value = top[idx];
+    });
+  } catch (_) {}
+}
+
+async function loadComparacion() {
+  const paises = [1,2,3,4]
+    .map(i => document.getElementById(`cmp-${i}`)?.value)
+    .filter(Boolean);
+  if (paises.length < 2) { showToast('Selecciona al menos 2 países', 'info'); return; }
+
+  const status = document.getElementById('cmp-status');
+  if (status) status.textContent = 'Consultando StarRocks...';
+
+  try {
+    const params = new URLSearchParams({ paises: paises.join(',') });
+    const rows = await fetch(`/api/graficas/comparar-mercados?${params}`).then(r => r.json());
+    if (rows.error || !rows.length) { showToast('Sin datos para esos países', 'error'); return; }
+
+    const labels   = rows.map(r => r.pais);
+    const colors   = PALETTE.slice(0, rows.length).map(c => c + 'cc');
+    const borders  = PALETTE.slice(0, rows.length);
+
+    const barOpts = (min, yLabel) => _baseOpts({
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#7a6872' } },
+        y: { beginAtZero: min == null, min, grid: { color: GRID_COLOR }, ticks: { color: '#7a6872' } },
+      },
+    });
+
+    const makeBar = (key, chartId, minVal) => {
+      _destroyChart(chartId);
+      const canvas = document.getElementById(`chart-cmp-${chartId}`);
+      if (!canvas) return;
+      S.charts[chartId] = new Chart(canvas, {
+        type: 'bar',
+        data: { labels, datasets: [{ data: rows.map(r => r[key]), backgroundColor: colors, borderColor: borders, borderWidth: 1, borderRadius: 6 }] },
+        options: barOpts(minVal),
+      });
+    };
+
+    makeBar('puntuacion', 'puntuacion', 85);
+    makeBar('precio',     'precio',     null);
+    makeBar('total',      'resenas',    null);
+    makeBar('variedades', 'variedades', null);
+
+    if (status) status.textContent = `Comparando: ${paises.join(', ')}`;
+    showToast('Comparación actualizada', 'success');
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+    if (status) status.textContent = '';
+  }
+}
+
+/* ── Tendencias de Precio ─────────────────────────────────────────────── */
+async function loadVariedadOptions() {
+  try {
+    const rows = await fetch('/api/variedades').then(r => r.json());
+    if (!rows.length) return;
+    const sel = document.getElementById('trend-variedad');
+    if (!sel) return;
+    const opts = rows.map(r => `<option value="${r.nombre}">${r.nombre} (${fmt(r.total)})</option>`).join('');
+    sel.innerHTML = '<option value="">Todas las variedades</option>' + opts;
+    // También llenar el filtro de variedad del panel principal
+    populateSelect('f-variedad', rows.map(r => r.nombre));
+  } catch (_) {}
+}
+
+async function loadTendencias() {
+  const variedad = document.getElementById('trend-variedad')?.value || '';
+  const params = new URLSearchParams();
+  if (variedad) params.set('variedad', variedad);
+
+  try {
+    const d = await fetch(`/api/graficas/tendencias-precio?${params}`).then(r => r.json());
+    if (d.error) { showToast(`Error: ${d.error}`, 'error'); return; }
+    if (!d.historico?.length) { showToast('Sin datos de tendencia para esta variedad', 'info'); return; }
+
+    _destroyChart('tendencias');
+    const canvas = document.getElementById('chart-tendencias');
+    if (!canvas) return;
+
+    const labelsHist = d.historico.map(h => String(h.year));
+    const labelsProj = d.proyeccion.map(p => String(p.year) + ' ▶');
+    const allLabels  = [...labelsHist, ...labelsProj];
+
+    // Serie histórica: valores reales + null en proyección
+    const dataHist = [
+      ...d.historico.map(h => h.precio),
+      ...new Array(d.proyeccion.length).fill(null),
+    ];
+    // Serie proyectada: null en histórico + punto de enlace + proyección
+    const dataProj = [
+      ...new Array(Math.max(0, labelsHist.length - 1)).fill(null),
+      d.historico.at(-1).precio,   // punto de enlace para continuidad visual
+      ...d.proyeccion.map(p => p.precio),
+    ];
+
+    S.charts.tendencias = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: allLabels,
+        datasets: [
+          {
+            label: `Precio histórico — ${d.variedad}`,
+            data: dataHist,
+            borderColor: PALETTE[0], backgroundColor: PALETTE[0] + '22',
+            borderWidth: 2.5, fill: true, tension: 0.35,
+            pointRadius: 5, pointBackgroundColor: PALETTE[0],
+            spanGaps: false,
+          },
+          {
+            label: 'Proyección (regresión lineal)',
+            data: dataProj,
+            borderColor: PALETTE[1], backgroundColor: 'transparent',
+            borderWidth: 2.5, borderDash: [7, 5], tension: 0.35,
+            pointRadius: 6, pointBorderColor: PALETTE[1], pointBackgroundColor: '#fff',
+            spanGaps: false,
+          },
+        ],
+      },
+      options: _baseOpts({
+        scales: {
+          x: { ticks: { color: '#7a6872', font: { size: 11 } } },
+          y: {
+            beginAtZero: false,
+            grid: { color: GRID_COLOR },
+            ticks: { color: '#7a6872', callback: v => '$' + Number(v).toFixed(0) },
+          },
+        },
+      }),
+    });
+
+    const meta = document.getElementById('trend-meta');
+    if (meta) {
+      const dir = d.tendencia > 0 ? '↑ al alza' : (d.tendencia < 0 ? '↓ a la baja' : '→ estable');
+      const col = d.tendencia > 0 ? '#4ade80' : (d.tendencia < 0 ? '#f87171' : '#7a6872');
+      meta.style.display = '';
+      meta.innerHTML = `Tendencia: <strong style="color:${col}">${dir} ($${Math.abs(d.tendencia).toFixed(2)}/año)</strong>
+        &nbsp;·&nbsp; ${d.historico.length} períodos históricos
+        &nbsp;·&nbsp; Proyección: <strong style="color:${PALETTE[1]}">$${d.proyeccion.map(p => p.precio.toFixed(0)).join(' / ')} </strong>`;
+    }
+
+    showToast(`Tendencia cargada: ${d.variedad}`, 'success');
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   checkEtlStatus();
   startPolling();
   await Promise.all([loadKPIs(), loadAllCharts(), loadTable()]);
   loadFilterOptions();
+  loadCountryOptions();
+  loadVariedadOptions();
 });
 </script>
 </body>
