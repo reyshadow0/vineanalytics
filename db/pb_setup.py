@@ -80,6 +80,44 @@ COLLECTIONS: dict[str, list[dict]] = {
         _TEXT("usuario"),                     # auditoría: quién (RNF-503)
         _DATE("fecha"),                       # auditoría: cuándo (RNF-503)
     ],
+    # ── OP3 · dashboards (CU-O05 / CU-O06) ────────────────────────────────────
+    # Sello del gate de calidad CU-O04 (RN-401). El sello vigente habilita publicar.
+    "sellos_calidad": [
+        _TEXT("suite", required=True),        # stage | dw | pipeline
+        _BOOL("exito"),
+        _NUM("evaluadas"),
+        _NUM("fallidas"),
+        _TEXT("detalle"),                     # JSON serializado de fallos
+        _NUM("vigencia_horas"),               # ventana de validez (def. 24 h)
+        _DATE("fecha"),
+    ],
+    # Definición de dashboards por cliente/tema (RF-301..304).
+    "dashboards": [
+        _TEXT("nombre", required=True),
+        _TEXT("cliente", required=True),      # id en `clientes` (multi-tenant, RN-403)
+        _TEXT("tema", required=True),         # ingresos | resenas | precios | uso
+        _NUM("version", required=True),       # RF-303 versionado
+        _TEXT("estado", required=True),       # BORRADOR..PUBLICADO / BLOQUEADO_SIN_CALIDAD
+        _TEXT("fuente_lectura"),              # clickhouse | starrocks (trazabilidad RT-01)
+        _TEXT("definicion"),                  # JSON: métricas + filtros + definiciones
+        _TEXT("usuario"),
+        _DATE("creado"),
+        _DATE("actualizado"),
+    ],
+    # Registro de publicaciones (RF-307 / RN-405): cuenta, permisos, versión, fecha.
+    "publicaciones": [
+        _TEXT("dashboard", required=True),    # id en `dashboards`
+        _TEXT("cuenta", required=True),       # id en `clientes` (cuenta destino)
+        _TEXT("plan"),                        # Dim_Plan vigente al publicar (RN-402)
+        _TEXT("permisos"),                    # JSON de roles/permisos
+        _NUM("version", required=True),
+        _BOOL("calidad_ok"),                  # RN-401: solo true si hubo sello vigente
+        _TEXT("sello"),                       # id del sello de calidad usado
+        _TEXT("estado"),                      # ACTIVA | DESPUBLICADA | REEMPLAZADA
+        _TEXT("usuario"),
+        _DATE("publicado_en"),
+        _DATE("baja_en"),
+    ],
 }
 
 # ── Semillas de catálogo (Dim_Plan / Dim_Estado_Suscripcion) ──────────────────

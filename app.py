@@ -1327,6 +1327,40 @@ def _audit(accion: str, detalle: str):
         pass
 
 
+# ── OP3 · lectura de métricas del dashboard: ClickHouse con fallback StarRocks ──
+def _metricas_tema_starrocks(tema: str, filtros: dict | None = None) -> dict:
+    """Fallback de lectura (capa DW) cuando ClickHouse no responde. Solo lectura;
+    misma semántica que /api/kpis. Las métricas de negocio (ingresos/uso) viven en
+    las tablas BSC y se devuelven vacías si aún no fueron proyectadas (sintéticas)."""
+    tema = (tema or "").lower()
+    try:
+        if tema in ("resenas", "reseñas"):
+            row = _fetchone("SELECT COUNT(*), ROUND(AVG(CAST(points AS DOUBLE)), 1) "
+                            "FROM fact_resenas")
+            return {"total_resenas": int(row[0] or 0),
+                    "puntuacion_promedio": float(row[1] or 0)} if row else {}
+        if tema == "precios":
+            row = _fetchone(
+                "SELECT ROUND(AVG(CASE WHEN price > 0 THEN CAST(price AS DOUBLE) END), 2), "
+                "MAX(CASE WHEN price > 0 THEN price END), "
+                "MIN(CASE WHEN price > 0 THEN price END) FROM fact_resenas")
+            return {"precio_promedio": float(row[0] or 0),
+                    "precio_maximo": float(row[1] or 0),
+                    "precio_minimo": float(row[2] or 0)} if row else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _leer_metricas_tema(tema: str, filtros: dict | None = None) -> dict:
+    """RT-01: lee de ClickHouse vía serving; si no hay datos, cae a StarRocks.
+    Devuelve {"fuente": "clickhouse"|"starrocks", "valores": {...}}."""
+    ch = serving.metricas_dashboard(tema, filtros)
+    if ch is not None:
+        return ch
+    return {"fuente": "starrocks", "valores": _metricas_tema_starrocks(tema, filtros)}
+
+
 @app.route("/planes", methods=["GET"])
 def planes_list():
     from pb_client import get_client
@@ -1432,6 +1466,166 @@ def clientes_acceso(cid):
     import models_clientes as mc
     try:
         return jsonify({"status": "ok", "acceso": mc.acceso_vigente(cid)})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# OP3 · CU-O05 construir dashboard / CU-O06 publicar a la cuenta del cliente
+# Lectura analítica SOLO de ClickHouse (serving) con fallback a StarRocks (RT-01).
+# Publicación bloqueada sin sello de calidad vigente (RN-401, regla dura).
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _rol_permitido(*roles):
+    """None si el rol de la sesión está permitido; si no, respuesta 403."""
+    if session.get("rol") not in roles:
+        return jsonify({"status": "error",
+                        "message": f"Acceso denegado ({'/'.join(roles)})"}), 403
+    return None
+
+
+def _err_dashboard(e):
+    """Mapea un DashboardError al código HTTP correcto."""
+    import models_dashboards as md
+    code = 403 if isinstance(e, md.FugaMultiTenant) else 409
+    return jsonify({"status": "error", "codigo": e.codigo,
+                    "message": e.mensaje, "detalle": e.detalle}), code
+
+
+@app.route("/api/dashboards/temas", methods=["GET"])
+def dashboards_temas():
+    import models_dashboards as md
+    return jsonify({"status": "ok", "temas": md.temas()})
+
+
+@app.route("/dashboards", methods=["GET", "POST"])
+def dashboards():
+    """GET: lista (filtrable por ?cliente=). POST: construir (CU-O05, analista/admin)."""
+    import models_dashboards as md
+    if request.method == "GET":
+        from pb_client import get_client
+        try:
+            cliente = request.args.get("cliente")
+            flt = {"cliente": cliente} if cliente else {}
+            return jsonify({"status": "ok", "dashboards": get_client().find("dashboards", **flt)})
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 502
+
+    denied = _rol_permitido("admin", "analista")  # construir = Analista de datos
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        dash = md.construir_dashboard(
+            cliente_id=d.get("cliente", ""), tema=d.get("tema", ""),
+            nombre=d.get("nombre"), filtros=d.get("filtros"),
+            lectura_fn=_leer_metricas_tema, usuario=session.get("username", "analista"))
+        _audit("CONSTRUIR_DASHBOARD",
+               f"dash={dash['id']} cliente={dash['cliente']} tema={dash['tema']} "
+               f"fuente={dash.get('fuente_lectura')}")
+        return jsonify({"status": "ok", "dashboard": dash}), 201
+    except md.DashboardError as e:
+        return _err_dashboard(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/dashboards/<did>/listo", methods=["POST"])
+def dashboards_listo(did):
+    """RF-303: marca el dashboard LISTO_PARA_PUBLICAR (analista/admin)."""
+    import models_dashboards as md
+    denied = _rol_permitido("admin", "analista")
+    if denied:
+        return denied
+    try:
+        dash = md.marcar_listo(did, usuario=session.get("username", "analista"))
+        _audit("DASHBOARD_LISTO", f"dash={did} -> {dash['estado']}")
+        return jsonify({"status": "ok", "dashboard": dash})
+    except md.DashboardError as e:
+        return _err_dashboard(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/dashboards/<did>/publicar", methods=["POST"])
+def dashboards_publicar(did):
+    """CU-O06 (admin): publica con permisos/versión. Bloquea sin calidad (RN-401)."""
+    import models_dashboards as md
+    denied = _solo_admin()  # autorizar publicación = Administrador
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        pub = md.publicar(did, cuenta_id=d.get("cuenta", ""),
+                          permisos=d.get("permisos"),
+                          usuario=session.get("username", "admin"))
+        _audit("PUBLICAR_DASHBOARD",
+               f"dash={did} cuenta={pub['cuenta']} v{pub['version']} sello={pub.get('sello')}")
+        return jsonify({"status": "ok", "publicacion": pub}), 201
+    except md.CalidadNoVigente as e:
+        _audit("PUBLICACION_BLOQUEADA", f"dash={did} motivo={e.mensaje}")
+        return _err_dashboard(e)
+    except md.DashboardError as e:
+        return _err_dashboard(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/dashboards/<did>/publicaciones", methods=["GET"])
+def dashboards_publicaciones(did):
+    """RF-307/RN-405: historial auditable de publicaciones del dashboard."""
+    import models_dashboards as md
+    try:
+        return jsonify({"status": "ok", "publicaciones": md.publicaciones_de(did)})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/publicaciones/<pid>/despublicar", methods=["POST"])
+def publicaciones_despublicar(pid):
+    """RF-308: despublica conservando el historial (admin)."""
+    import models_dashboards as md
+    denied = _solo_admin()
+    if denied:
+        return denied
+    try:
+        pub = md.despublicar(pid, usuario=session.get("username", "admin"))
+        _audit("DESPUBLICAR_DASHBOARD", f"pub={pid} -> {pub['estado']}")
+        return jsonify({"status": "ok", "publicacion": pub})
+    except md.DashboardError as e:
+        return _err_dashboard(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/calidad/estado", methods=["GET"])
+def calidad_estado():
+    """Estado del sello de calidad (CU-O04) que gobierna la publicación (RN-401)."""
+    import models_dashboards as md
+    try:
+        return jsonify({"status": "ok", "calidad": md.calidad_vigente()})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/calidad/sello", methods=["POST"])
+def calidad_sello():
+    """Registra manualmente un sello de calidad (admin). El gate automático lo
+    emite `quality/run_quality.py` tras cada corrida del pipeline."""
+    import models_dashboards as md
+    denied = _solo_admin()
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        sello = md.registrar_sello(
+            suite=d.get("suite", "manual"),
+            exito=str(d.get("exito", "true")).lower() in ("1", "true", "si", "sí", "yes"),
+            evaluadas=int(d.get("evaluadas", 0) or 0),
+            fallidas=int(d.get("fallidas", 0) or 0),
+            vigencia_horas=float(d.get("vigencia_horas", 24) or 24))
+        _audit("SELLO_CALIDAD", f"sello={sello['id']} suite={sello['suite']} exito={sello['exito']}")
+        return jsonify({"status": "ok", "sello": sello}), 201
     except Exception as exc:
         return jsonify({"status": "error", "message": str(exc)}), 502
 

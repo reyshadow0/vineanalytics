@@ -182,6 +182,78 @@ def v1_mercados():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# DASHBOARDS POR CLIENTE / TEMA (CU-O05) — lectura desde ClickHouse
+# ══════════════════════════════════════════════════════════════════════════════
+
+def metricas_dashboard(tema: str, filtros: dict | None = None):
+    """Lee las métricas de un tema desde las agregaciones ClickHouse (RF-301/304).
+
+    Devuelve ``{"fuente": "clickhouse", "valores": {clave: valor}}`` o **None** si
+    ClickHouse no está disponible / la agregación está vacía. Al devolver None,
+    app.py cae a StarRocks (fallback, RT-01/RT-02). Soporta el filtro Dim_Mercado
+    (`filtros["mercado"]`) en los temas que lo permiten; los demás filtros (tiempo,
+    cliente, plan) acotan/aíslan la vista y se registran en la definición.
+    """
+    filtros = filtros or {}
+    tema = (tema or "").lower()
+    mercado = filtros.get("mercado")
+
+    if tema in ("resenas", "reseñas"):
+        if mercado:
+            safe = str(mercado).replace("'", "''")
+            rows = _q(f"SELECT total, puntuacion_promedio FROM agg_pais "
+                      f"WHERE pais = '{safe}' LIMIT 1")
+            if not rows:
+                return None
+            r = rows[0]
+            return {"fuente": "clickhouse", "valores": {
+                "total_resenas": int(r[0] or 0), "puntuacion_promedio": float(r[1] or 0)}}
+        rows = _q("SELECT total_resenas, puntuacion_promedio FROM agg_kpis_vino LIMIT 1")
+        if not rows or int(rows[0][0] or 0) == 0:
+            return None
+        r = rows[0]
+        return {"fuente": "clickhouse", "valores": {
+            "total_resenas": int(r[0]), "puntuacion_promedio": float(r[1] or 0)}}
+
+    if tema == "precios":
+        if mercado:
+            safe = str(mercado).replace("'", "''")
+            rows = _q(f"SELECT precio_promedio FROM agg_pais WHERE pais = '{safe}' LIMIT 1")
+            if not rows:
+                return None
+            return {"fuente": "clickhouse", "valores": {
+                "precio_promedio": float(rows[0][0] or 0),
+                "precio_maximo": None, "precio_minimo": None}}
+        rows = _q("SELECT precio_promedio, precio_maximo, precio_minimo "
+                  "FROM agg_kpis_vino LIMIT 1")
+        if not rows:
+            return None
+        r = rows[0]
+        return {"fuente": "clickhouse", "valores": {
+            "precio_promedio": float(r[0] or 0), "precio_maximo": float(r[1] or 0),
+            "precio_minimo": float(r[2] or 0)}}
+
+    if tema == "ingresos":
+        rows = _q("SELECT mrr_actual, churn, clientes_activos FROM agg_bsc_kpis LIMIT 1")
+        if not rows:
+            return None
+        r = rows[0]
+        return {"fuente": "clickhouse", "valores": {
+            "mrr_actual": float(r[0] or 0), "churn": float(r[1] or 0),
+            "clientes_activos": int(r[2] or 0)}}
+
+    if tema == "uso":
+        rows = _q("SELECT adopcion, nps FROM agg_bsc_kpis LIMIT 1")
+        if not rows:
+            return None
+        r = rows[0]
+        return {"fuente": "clickhouse", "valores": {
+            "adopcion": float(r[0] or 0), "nps": float(r[1] or 0)}}
+
+    return None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # BALANCED SCORECARD
 # ══════════════════════════════════════════════════════════════════════════════
 
