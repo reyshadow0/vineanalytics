@@ -1,0 +1,29 @@
+version: 2
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Fuentes = tablas StarRocks ya pobladas por el ETL existente
+# (db/starrocks_setup.py + etl/loader.py / etl/transformer.py).
+# Declararlas como sources da el origen del linaje (Princ. VII): toda columna
+# del marts Fact-Dim se rastrea hasta aquí con `dbt docs`.
+# ──────────────────────────────────────────────────────────────────────────────
+sources:
+  - name: dw_vitivinicola
+    description: "Data Warehouse vitivinícola en StarRocks (reseñas + dimensiones)."
+    schema: "{{ env_var('STARROCKS_DB', 'retailytics') }}"
+    tables:
+      - name: fact_resenas
+        description: "Reseñas de vino ingeridas (puntos + precio + texto)."
+        columns:
+          - name: id_resena
+            description: "PK de la reseña."
+            tests: [not_null, unique]
+      - name: dim_pais
+        description: "País de origen (actúa como mercado vitivinícola)."
+      - name: dim_variedad
+        description: "Variedad / tipo de vino."
+      - name: dim_bodega
+        description: "Bodega productora."
+      - name: dim_region
+        description: "Región / denominación de origen."
+      - name: dim_catador
+        description: "Catador / sumiller fuente de la reseña."

@@ -12,6 +12,17 @@ temporales coherentes con las metas del documento de Desarrollo Empresarial:
 
 Es idempotente: TRUNCATE + INSERT en cada tabla. Determinista vía SEED.
 Las dimensiones vitivinícolas (fact_resenas, dim_pais…) no se tocan.
+
+────────────────────────────────────────────────────────────────────────────
+SEED SINTÉTICO / DEMO — FUERA DEL DAG DE PRODUCCIÓN.
+Excepción documentada al Principio VI (transformación declarativa en DBT) y al
+orden de capas (Princ. Arq.): este generador inserta datos de demostración
+DIRECTAMENTE en StarRocks, sin pasar por Parquet/staging ni por DBT. Su único
+fin es poblar el Balanced Scorecard para la demo cuando no hay datos reales.
+NO debe invocarse desde el DAG de Airflow del pipeline productivo
+(ingesta → calidad → ETL/DBT → calidad → agregaciones). Para datos reales, el
+flujo declarativo vive en dbt_vinanalytics/ + quality/ (Fases 1–N).
+────────────────────────────────────────────────────────────────────────────
 """
 
 import random

@@ -1,0 +1,7 @@
+# Runner de calidad Great Expectations (Fase 1). Versiones fijadas (RT-17).
+# Se usa la API PandasDataset (estable) → great-expectations 0.18.x.
+great-expectations==0.18.22
+pandas>=2.2.0
+pyarrow>=15.0.0
+mysql-connector-python>=9.0.0
+sqlalchemy>=2.0.0

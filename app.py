@@ -34,6 +34,8 @@ from config import (
     POCKETBASE_URL, POCKETBASE_COLLECTION, STAGE_DIR,
 )
 
+import serving   # capa de lectura ClickHouse (Fase 2) con fallback a StarRocks
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "vinanalytics-secret-2024")
 
@@ -56,6 +58,13 @@ with app.app_context():
         start_monitor()
     except Exception as _e:
         print(f"[WARN] Inicialización StarRocks: {_e}")
+    # CU-O08 (OP5): base operacional de cuentas/suscripciones en PocketBase.
+    # Independiente de StarRocks; si PocketBase no está arriba aún, no bloquea.
+    try:
+        from db.pb_setup import setup as _pb_setup
+        print(f"[OK] PocketBase suscripciones: {_pb_setup()}")
+    except Exception as _e:
+        print(f"[WARN] Inicialización PocketBase (suscripciones): {_e}")
 
 STAGE         = Path(STAGE_DIR)
 RAW_PARQUET   = STAGE / "wine_raw.parquet"
@@ -328,6 +337,9 @@ def admin():
 
 @app.route("/api/kpis")
 def api_kpis():
+    _ch = serving.kpis()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         row = _fetchone("""
             SELECT
@@ -426,6 +438,9 @@ def api_resenas():
 
 @app.route("/api/graficas/paises")
 def api_graficas_paises():
+    _ch = serving.grafica_paises()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         rows = _fetchall("""
             SELECT dp.nombre, ROUND(AVG(CAST(fr.points AS DOUBLE)),1) AS avg_pts, COUNT(*) AS total
@@ -440,6 +455,9 @@ def api_graficas_paises():
 
 @app.route("/api/graficas/variedades")
 def api_graficas_variedades():
+    _ch = serving.grafica_variedades()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         rows = _fetchall("""
             SELECT dv.nombre, ROUND(AVG(CAST(fr.price AS DOUBLE)),2) AS avg_price, COUNT(*) AS total
@@ -454,6 +472,9 @@ def api_graficas_variedades():
 
 @app.route("/api/graficas/puntuacion")
 def api_graficas_puntuacion():
+    _ch = serving.grafica_puntuacion()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         rows = _fetchall("""
             SELECT points, COUNT(*) AS total
@@ -467,6 +488,9 @@ def api_graficas_puntuacion():
 
 @app.route("/api/graficas/bodegas")
 def api_graficas_bodegas():
+    _ch = serving.grafica_bodegas()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         rows = _fetchall("""
             SELECT db.nombre, ROUND(AVG(CAST(fr.points AS DOUBLE)),1) AS avg_pts, COUNT(*) AS total
@@ -536,6 +560,10 @@ def api_export_csv():
 @app.route("/api/graficas/comparar-mercados")
 def api_graficas_comparar_mercados():
     """KPIs comparativos para hasta 4 países (query param: paises=Italy,France,...)."""
+    _paises = [p.strip() for p in request.args.get("paises", "").split(",") if p.strip()][:4]
+    _ch = serving.comparar_mercados(_paises)
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         paises = [p.strip() for p in request.args.get("paises", "").split(",") if p.strip()][:4]
         if not paises:
@@ -639,6 +667,9 @@ def api_graficas_tendencias_precio():
 @app.route("/api/paises")
 def api_paises():
     """Lista todos los países disponibles ordenados por cantidad de reseñas."""
+    _ch = serving.paises()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         rows = _fetchall("""
             SELECT dp.nombre, COUNT(*) AS n
@@ -654,6 +685,9 @@ def api_paises():
 @app.route("/api/variedades")
 def api_variedades():
     """Lista las principales variedades ordenadas por cantidad de reseñas."""
+    _ch = serving.variedades()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         rows = _fetchall("""
             SELECT dv.nombre, COUNT(*) AS n
@@ -668,6 +702,9 @@ def api_variedades():
 
 @app.route("/api/browse")
 def api_browse():
+    _ch = serving.browse()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         paises     = _fetchall("SELECT dp.nombre, COUNT(*) AS n FROM fact_resenas fr JOIN dim_pais dp ON fr.id_pais=dp.id_pais GROUP BY dp.nombre ORDER BY n DESC LIMIT 6")
         variedades = _fetchall("SELECT dv.nombre, COUNT(*) AS n FROM fact_resenas fr JOIN dim_variedad dv ON fr.id_variedad=dv.id_variedad GROUP BY dv.nombre ORDER BY n DESC LIMIT 6")
@@ -739,6 +776,9 @@ def etl_generar_bsc():
 @app.route("/api/bsc/kpis")
 def api_bsc_kpis():
     """CU-E01 — Tarjetas del Balanced Scorecard por las 4 perspectivas."""
+    _ch = serving.bsc_kpis()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         latest, prev_year, first = _bsc_periodos()
         if latest is None:
@@ -840,6 +880,9 @@ def api_bsc_kpis():
 @app.route("/api/bsc/series")
 def api_bsc_series():
     """Series temporales y rankings para los casos CU-E02 … CU-E06."""
+    _ch = serving.bsc_series()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         latest, _prev, _first = _bsc_periodos()
         if latest is None:
@@ -1027,6 +1070,9 @@ def api_v1_vinos():
 @require_api_key
 def api_v1_mercados():
     """Indicadores agregados por mercado (país)."""
+    _ch = serving.v1_mercados()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         rows = _fetchall("""SELECT dp.nombre, COUNT(*),
                                    ROUND(AVG(CAST(fr.points AS DOUBLE)),1),
@@ -1057,6 +1103,9 @@ def api_v1_precios():
 @require_api_key
 def api_v1_scorecard():
     """Resumen ejecutivo del Balanced Scorecard (KPIs principales)."""
+    _ch = serving.v1_scorecard()
+    if _ch is not None:
+        return jsonify(_ch)
     try:
         latest, prev_year, _ = _bsc_periodos()
         if latest is None:
@@ -1254,6 +1303,137 @@ def respaldos_eliminar():
 @app.route("/api/db-status")
 def api_db_status():
     return jsonify({"status": get_db_status()})
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CU-O08 (OP5) — Cuentas y suscripciones de clientes (capa operacional PocketBase)
+# Toda la lógica vive en models_clientes.py; aquí solo el transporte HTTP + auth
+# de Administrador + auditoría en StarRocks. No se escribe al DW (RN-606).
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _solo_admin():
+    """Devuelve None si el actor es admin; si no, una respuesta 403."""
+    if session.get("rol") != "admin":
+        return jsonify({"status": "error", "message": "Acceso denegado (admin)"}), 403
+    return None
+
+
+def _audit(accion: str, detalle: str):
+    try:
+        registrar_evento(session.get("username", "sistema"),
+                         session.get("rol", "admin"), accion, detalle,
+                         request.remote_addr)
+    except Exception:
+        pass
+
+
+@app.route("/planes", methods=["GET"])
+def planes_list():
+    from pb_client import get_client
+    try:
+        return jsonify({"status": "ok", "planes": get_client().find("planes")})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/clientes", methods=["GET", "POST"])
+def clientes():
+    import models_clientes as mc
+    if request.method == "GET":
+        from pb_client import get_client
+        try:
+            return jsonify({"status": "ok", "clientes": get_client().find("clientes")})
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 502
+
+    denied = _solo_admin()
+    if denied:
+        return denied
+    datos = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        cli = mc.crear_cliente(datos)
+        _audit("ALTA_CLIENTE", f"cliente={cli['id']} {cli.get('razon_social','')}")
+        return jsonify({"status": "ok", "cliente": cli}), 201
+    except mc.ReglaNegocioError as e:
+        return jsonify({"status": "error", "codigo": e.codigo,
+                        "message": e.mensaje, "detalle": e.detalle}), 409
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/suscripciones", methods=["POST"])
+def suscripciones_crear():
+    import models_clientes as mc
+    denied = _solo_admin()
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        susc = mc.crear_suscripcion(
+            cliente_id=d.get("cliente_id", ""),
+            plan_codigo=d.get("plan", ""),
+            periodo=d.get("periodo", "mensual"),
+            facturacion=d.get("facturacion"),
+            monto=d.get("monto"),
+            moneda=d.get("moneda", "USD"),
+            usuario=session.get("username", "admin"),
+        )
+        _audit("ALTA_SUSCRIPCION",
+               f"susc={susc['id']} cliente={susc['cliente']} plan={susc['plan']} estado={susc['estado']}")
+        return jsonify({"status": "ok", "suscripcion": susc}), 201
+    except mc.ReglaNegocioError as e:
+        return jsonify({"status": "error", "codigo": e.codigo,
+                        "message": e.mensaje, "detalle": e.detalle}), 409
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/suscripciones/<sid>/estado", methods=["POST"])
+def suscripciones_estado(sid):
+    import models_clientes as mc
+    denied = _solo_admin()
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        susc = mc.cambiar_estado(sid, d.get("estado", ""),
+                                 usuario=session.get("username", "admin"))
+        _audit("CAMBIO_ESTADO_SUSCRIPCION", f"susc={sid} -> {susc['estado']}")
+        return jsonify({"status": "ok", "suscripcion": susc})
+    except mc.ReglaNegocioError as e:
+        return jsonify({"status": "error", "codigo": e.codigo,
+                        "message": e.mensaje, "detalle": e.detalle}), 409
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/suscripciones/<sid>/plan", methods=["POST"])
+def suscripciones_plan(sid):
+    import models_clientes as mc
+    denied = _solo_admin()
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        susc = mc.cambiar_plan(sid, d.get("plan", ""),
+                               usuario=session.get("username", "admin"))
+        _audit("CAMBIO_PLAN_SUSCRIPCION", f"susc={sid} -> {susc['plan']}")
+        return jsonify({"status": "ok", "suscripcion": susc})
+    except mc.ReglaNegocioError as e:
+        return jsonify({"status": "error", "codigo": e.codigo,
+                        "message": e.mensaje, "detalle": e.detalle}), 409
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/clientes/<cid>/acceso", methods=["GET"])
+def clientes_acceso(cid):
+    """RF-507/RN-603: plan/estado vigente para autorizar dashboards/API."""
+    import models_clientes as mc
+    try:
+        return jsonify({"status": "ok", "acceso": mc.acceso_vigente(cid)})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
 
 
 # ═════════════════════════════════════════════════════════════════════════════

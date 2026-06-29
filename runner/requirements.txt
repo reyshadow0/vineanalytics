@@ -1,0 +1,10 @@
+# Runner dedicado del pipeline (ETL + DBT + Great Expectations + ClickHouse).
+# Aislado de Airflow para evitar conflictos de pip. Versiones fijadas (RT-17).
+pandas>=2.2.0
+pyarrow>=15.0.0
+requests>=2.31.0
+mysql-connector-python>=9.0.0
+clickhouse-connect>=0.7.0
+great-expectations==0.18.22
+dbt-core==1.7.18
+dbt-starrocks==1.7.1

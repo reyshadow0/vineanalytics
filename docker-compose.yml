@@ -1,10 +1,8 @@
-version: '3.8'
-
 services:
 
   # ── PocketBase: fuente de datos raw ──────────────────────────────────────
   pocketbase:
-    image: ghcr.io/muchobien/pocketbase:latest
+    image: ghcr.io/muchobien/pocketbase:0.22.21   # versión fijada (RT-17)
     container_name: vinanalytics-pocketbase
     ports:
       - "8090:8090"
@@ -14,7 +12,7 @@ services:
 
   # ── StarRocks: analytics + usuarios + auditoría ───────────────────────────
   starrocks:
-    image: starrocks/allin1-ubuntu:latest
+    image: starrocks/allin1-ubuntu:3.3.5   # versión fijada (RT-17)
     container_name: vinanalytics-starrocks
     ports:
       - "9030:9030"   # MySQL protocol
@@ -29,6 +27,27 @@ services:
       retries: 12
       start_period: 120s
 
+  # ── ClickHouse: capa de agregaciones / serving del dashboard (Fase 2) ────────
+  # Se alimenta SOLO desde StarRocks vía clickhouse/populate.py (RT-02).
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3   # versión fijada (RT-17)
+    container_name: vinanalytics-clickhouse
+    ports:
+      - "8123:8123"   # HTTP (usado por clickhouse-connect / serving.py)
+      - "9000:9000"   # protocolo nativo
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+
   # ── Flask: servidor web ───────────────────────────────────────────────────
   flask:
     build: .
@@ -39,10 +58,17 @@ services:
       - STARROCKS_HOST=starrocks
       - POCKETBASE_URL=http://pocketbase:8090
       - SECRET_KEY=vinanalytics-docker-secret-2024
+      # ClickHouse (serving del dashboard; si no está, app cae a StarRocks)
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DB=vinanalytics
+      - CLICKHOUSE_ENABLED=1
     depends_on:
       starrocks:
         condition: service_healthy
       pocketbase:
+        condition: service_started
+      clickhouse:
         condition: service_started
     volumes:
       - ./stage:/app/stage
@@ -56,10 +82,66 @@ services:
       - ./csv_loader.py:/app/csv_loader.py
       - ./db_manager.py:/app/db_manager.py
       - ./config.py:/app/config.py
+      - ./serving.py:/app/serving.py
+      - ./pb_client.py:/app/pb_client.py          # CU-O08: cliente PocketBase
+      - ./models_clientes.py:/app/models_clientes.py  # CU-O08: lógica cuentas/suscripciones
       - ./etl:/app/etl
       - ./db:/app/db
+      - ./clickhouse:/app/clickhouse
       - ./data:/app/data
+
+  # ── Runner del pipeline: ETL + DBT + Great Expectations + ClickHouse ─────────
+  # Contenedor de larga vida con TODAS las dependencias del pipeline. Airflow
+  # ejecuta cada etapa con `docker exec`. Aislado de Airflow → sin conflicto pip.
+  # Su /app (bind del repo) conserva el stage/ Parquet entre etapas.
+  runner:
+    build:
+      context: .
+      dockerfile: runner/Dockerfile      # python:3.11 + deps del pipeline (versión fija)
+    container_name: vinanalytics-runner
+    working_dir: /app
+    environment:
+      - PYTHONPATH=/app
+      - DBT_PROFILES_DIR=/app/dbt_vinanalytics
+      - STARROCKS_HOST=starrocks
+      - POCKETBASE_URL=http://pocketbase:8090
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DB=vinanalytics
+      - CLICKHOUSE_ENABLED=1
+    depends_on:
+      starrocks:
+        condition: service_healthy
+      clickhouse:
+        condition: service_started
+      pocketbase:
+        condition: service_started
+    volumes:
+      - .:/app                            # código + stage/ compartido entre etapas
+
+  # ── Apache Airflow: orquestación (Fase 3) ────────────────────────────────────
+  # Modo standalone (scheduler + webserver + SQLite). NO ejecuta el pipeline en su
+  # propio entorno: cada tarea hace `docker exec vinanalytics-runner ...`.
+  airflow:
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile     # Airflow 2.9.3 + CLI de Docker (versión fija)
+    container_name: vinanalytics-airflow
+    command: standalone
+    ports:
+      - "8080:8080"                       # UI de Airflow (clave generada al 1er arranque)
+    environment:
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+    depends_on:
+      runner:
+        condition: service_started
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags           # DAGs
+      - airflow_data:/opt/airflow                  # metadatos/logs persistentes
+      - /var/run/docker.sock:/var/run/docker.sock  # para `docker exec` al runner
 
 volumes:
   pocketbase_data:
   starrocks_data:
+  clickhouse_data:
+  airflow_data:

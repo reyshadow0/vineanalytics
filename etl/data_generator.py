@@ -2,6 +2,15 @@
 Genera N reseñas de vino con datos aleatorios e inserta directo en StarRocks.
 Lee las dimensiones existentes para usar FKs válidas.
 Algunos campos se dejan vacíos intencionalmente.
+
+────────────────────────────────────────────────────────────────────────────
+SEED SINTÉTICO / DEMO — FUERA DEL DAG DE PRODUCCIÓN.
+Excepción documentada al Principio VI (transformación declarativa en DBT) y al
+orden de capas: inserta reseñas de prueba DIRECTAMENTE en StarRocks, sin pasar
+por Parquet/staging ni por DBT. Solo para volumen de demostración en fact_resenas.
+NO debe invocarse desde el DAG de Airflow del pipeline productivo. El flujo
+declarativo real vive en dbt_vinanalytics/ + quality/.
+────────────────────────────────────────────────────────────────────────────
 """
 
 import random

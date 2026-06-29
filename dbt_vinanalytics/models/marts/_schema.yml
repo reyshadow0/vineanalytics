@@ -1,0 +1,105 @@
+version: 2
+
+# Tests DBT en columnas clave (Princ. VI · RT-13):
+#   unique, not_null, relationships (FK→Dim), accepted_values.
+# Más dos tests singulares de dominio en tests/ (rango de puntaje, precio > 0).
+
+models:
+  # ── DIMENSIONES ─────────────────────────────────────────────────────────────
+  - name: dim_vino
+    description: "Dim_Vino — variedad/tipo de vino."
+    columns:
+      - name: id_vino
+        description: "PK."
+        tests: [not_null, unique]
+      - name: variedad
+        tests: [not_null]
+
+  - name: dim_bodega_vino
+    description: "Dim_Bodega — bodega productora."
+    columns:
+      - name: id_bodega
+        tests: [not_null, unique]
+
+  - name: dim_region_vitivinicola
+    description: "Dim_Region_Vitivinicola — región/denominación de origen."
+    columns:
+      - name: id_region
+        tests: [not_null, unique]
+
+  - name: dim_catador_sumiller
+    description: "Dim_Catador_Sumiller — fuente de la reseña/puntuación."
+    columns:
+      - name: id_catador
+        tests: [not_null, unique]
+
+  - name: dim_mercado_vino
+    description: "Dim_Mercado (vitivinícola) — país de origen como mercado."
+    columns:
+      - name: id_mercado
+        tests: [not_null, unique]
+
+  # ── HECHOS ──────────────────────────────────────────────────────────────────
+  - name: fct_resena
+    description: "Fact_Resena — reseña con FKs resueltas (CU-O02)."
+    columns:
+      - name: id_resena
+        description: "PK del hecho reseña."
+        tests: [not_null, unique]
+      - name: id_vino
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_vino')
+              field: id_vino
+      - name: id_bodega
+        tests:
+          - relationships:
+              to: ref('dim_bodega_vino')
+              field: id_bodega
+      - name: id_region
+        tests:
+          - relationships:
+              to: ref('dim_region_vitivinicola')
+              field: id_region
+      - name: id_catador
+        tests:
+          - relationships:
+              to: ref('dim_catador_sumiller')
+              field: id_catador
+      - name: id_mercado
+        tests:
+          - relationships:
+              to: ref('dim_mercado_vino')
+              field: id_mercado
+
+  - name: fct_puntuacion
+    description: "Fact_Puntuacion — puntaje del catador, dominio 80–100."
+    columns:
+      - name: id_puntuacion
+        tests: [not_null, unique]
+      - name: id_vino
+        tests:
+          - relationships:
+              to: ref('dim_vino')
+              field: id_vino
+      - name: id_catador
+        tests:
+          - relationships:
+              to: ref('dim_catador_sumiller')
+              field: id_catador
+
+  - name: fct_precio_mercado
+    description: "Fact_Precio_Mercado — precio por vino/mercado (USD)."
+    columns:
+      - name: id_precio
+        tests: [not_null, unique]
+      - name: moneda
+        tests:
+          - accepted_values:
+              values: ['USD']
+      - name: id_mercado
+        tests:
+          - relationships:
+              to: ref('dim_mercado_vino')
+              field: id_mercado

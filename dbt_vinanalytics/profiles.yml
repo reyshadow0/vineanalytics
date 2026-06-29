@@ -1,0 +1,13 @@
+# Perfil DBT para StarRocks (protocolo MySQL, puerto 9030).
+# Reutiliza las mismas credenciales que config.py vía variables de entorno.
+# Uso: dbt run --profiles-dir .   (o export DBT_PROFILES_DIR=$(pwd))
+vinanalytics:
+  target: dev
+  outputs:
+    dev:
+      type: starrocks
+      host: "{{ env_var('STARROCKS_HOST', 'localhost') }}"
+      port: 9030
+      schema: "{{ env_var('STARROCKS_DB', 'retailytics') }}"
+      username: "{{ env_var('STARROCKS_USER', 'root') }}"
+      password: "{{ env_var('STARROCKS_PASS', '') }}"

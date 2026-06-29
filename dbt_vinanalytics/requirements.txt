@@ -1,0 +1,3 @@
+# Runner DBT para StarRocks (Fase 1). Versiones fijadas (Princ. VIII / RT-17).
+dbt-core==1.7.18
+dbt-starrocks==1.7.1

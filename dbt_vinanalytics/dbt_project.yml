@@ -1,0 +1,31 @@
+name: 'vinanalytics'
+version: '1.0.0'
+config-version: 2
+
+# Perfil de conexión (ver profiles.yml en esta misma carpeta).
+profile: 'vinanalytics'
+
+model-paths: ["models"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Transformación declarativa CU-O03 (Princ. VI de la constitución).
+#   staging/ → vistas ligeras sobre las tablas StarRocks ya cargadas (sources).
+#   marts/   → modelo Fact-Dim curado y testeado (materializado como table).
+# Los nombres de marts NO colisionan con las tablas existentes
+# (fact_resenas, dim_pais, dim_variedad, ...): aquí son fct_* y dim_*_vino.
+# ──────────────────────────────────────────────────────────────────────────────
+models:
+  vinanalytics:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
