@@ -1,116 +1,67 @@
 """
-Extrae todos los registros de la coleccion retail_data en PocketBase
-paginando de 500 en 500 y guarda el resultado en stage/retail_raw.parquet.
+etl/extractor.py — Punto de entrada de ingesta de reseñas (CU-O02, OP1).
+
+Conserva el contrato histórico del DAG (`python -m etl.extractor` →
+stage/wine_raw.parquet), pero ahora delega en el catálogo de fuentes (CU-O01,
+`etl/source_catalog.py`) y el motor de ingesta (`etl/ingesta.py`):
+
+  1. Garantiza que la fuente `wine_reviews` esté registrada y HABILITADA (RN-201).
+  2. Lee el incremento desde PocketBase.
+  3. Valida esquema, deduplica por clave natural, desvía rechazos a `rejects/` y
+     escribe Parquet snappy (particionado + vista plana wine_raw.parquet).
+  4. Emite el reporte de ingesta (filas leídas/cargadas/rechazadas/duplicadas).
+
+No transforma a Fact-Dim ni toca StarRocks (RN-206): eso es OP2 (CU-O03).
 """
 
 import sys
 from pathlib import Path
-import pandas as pd
-import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from config import (
-    POCKETBASE_URL, POCKETBASE_COLLECTION, STAGE_DIR,
-    POCKETBASE_ADMIN_EMAIL, POCKETBASE_ADMIN_PASSWORD,
-)
 
-ENDPOINT  = f"{POCKETBASE_URL}/api/collections/{POCKETBASE_COLLECTION}/records"
-OUT_FILE  = Path(STAGE_DIR) / "wine_raw.parquet"
+from config import POCKETBASE_COLLECTION, STAGE_DIR
+from pb_client import get_client
+from etl import ingesta, source_catalog
+
+OUT_FILE = Path(STAGE_DIR) / "wine_raw.parquet"
 PAGE_SIZE = 500
-
-AUTH_ENDPOINTS = [
-    f"{POCKETBASE_URL}/api/collections/_superusers/auth-with-password",
-    f"{POCKETBASE_URL}/api/_superusers/auth-with-password",
-    f"{POCKETBASE_URL}/api/admins/auth-with-password",
-]
-
-
-def _get_auth_token() -> str:
-    payload = {"identity": POCKETBASE_ADMIN_EMAIL, "password": POCKETBASE_ADMIN_PASSWORD}
-    for url in AUTH_ENDPOINTS:
-        try:
-            r = requests.post(url, json=payload, timeout=10)
-            if r.status_code == 200:
-                token = r.json().get("token", "")
-                if token:
-                    return token
-        except requests.RequestException:
-            continue
-    raise RuntimeError("No se pudo obtener token de PocketBase.")
 
 
 def extract(page_size: int = PAGE_SIZE) -> Path:
-    print("Autenticando en PocketBase ...")
-    token = _get_auth_token()
-    print("  [OK] Token obtenido\n")
-    auth_headers = {"Authorization": f"Bearer {token}"}
-
+    """Ingiere la fuente de reseñas de PocketBase a staging. Devuelve el Parquet
+    plano (wine_raw.parquet) para compatibilidad con el ETL/GE posterior."""
     Path(STAGE_DIR).mkdir(exist_ok=True)
 
-    records: list[dict] = []
-    page = 1
-    total_pages = None
+    client = get_client()
+    if not client.health():
+        print("[ERROR] PocketBase no está accesible; no se puede ingerir.")
+        sys.exit(1)
 
-    print(f"Extrayendo de PocketBase -> {ENDPOINT}")
-    print(f"Tamano de pagina: {page_size} registros\n")
+    # CU-O01: la fuente debe existir y estar HABILITADA antes de ingerir (RN-201).
+    print("Verificando catálogo de fuentes (CU-O01) ...")
+    fuente = source_catalog.ensure_fuente_wine_reviews(POCKETBASE_COLLECTION, client)
+    print(f"  [OK] Fuente '{fuente['nombre']}' — estado {fuente['estado']}\n")
 
-    while True:
-        try:
-            resp = requests.get(
-                ENDPOINT,
-                params={"page": page, "perPage": page_size},
-                headers=auth_headers,
-                timeout=30,
-            )
-            resp.raise_for_status()
-        except requests.exceptions.ConnectionError:
-            print(f"\n[ERROR] No se puede conectar a PocketBase en {POCKETBASE_URL}")
-            print("  Verifique que PocketBase este corriendo y vuelva a intentarlo.")
-            sys.exit(1)
-        except requests.exceptions.HTTPError as exc:
-            print(f"\n[ERROR] HTTP {exc.response.status_code}: {exc.response.text[:200]}")
-            sys.exit(1)
+    print(f"Ingestando '{POCKETBASE_COLLECTION}' (CU-O02) ...")
+    reporte = ingesta.ingestar_fuente(fuente, client=client, escribir_plano=True)
 
-        data = resp.json()
+    # ── Reporte de ingesta (RF-110) ───────────────────────────────────────────
+    print("\n" + "=" * 56)
+    print("REPORTE DE INGESTA")
+    print("=" * 56)
+    for k in ("estado", "filas_leidas", "filas_validas", "filas_duplicadas",
+              "filas_rechazadas", "filas_cargadas", "pct_rechazo"):
+        if k in reporte:
+            print(f"  {k:18s}: {reporte[k]}")
+    print(f"  staging           : {reporte.get('ruta_staging')}")
+    print(f"  rechazos          : {reporte.get('ruta_rechazos')}")
+    print("=" * 56)
 
-        if total_pages is None:
-            total_pages = data.get("totalPages", 1)
-            total_items = data.get("totalItems", "?")
-            print(f"Total de registros en PocketBase: {total_items:,}")
-            print(f"Total de paginas: {total_pages}\n")
+    if reporte["estado"] == "FALLIDA":
+        print("\n[ALERTA] Lote FALLIDA: el staging NO fue actualizado.")
+        sys.exit(1)
 
-        items = data.get("items", [])
-        if not items:
-            break
-
-        # Quitar campos meta de PocketBase antes de acumular
-        meta = {"id", "collectionId", "collectionName", "created", "updated", "expand"}
-        clean_items = [{k: v for k, v in item.items() if k not in meta} for item in items]
-        records.extend(clean_items)
-
-        pct = page / total_pages * 100
-        print(f"  Pagina {page:>4}/{total_pages}  |  {len(records):>8,} registros acumulados  |  {pct:5.1f}%")
-
-        if page >= total_pages:
-            break
-        page += 1
-
-    print(f"\nCombinando {len(records):,} registros en DataFrame ...")
-    df = pd.DataFrame(records)
-
-    df.to_parquet(OUT_FILE, index=False)
-
-    size_bytes = OUT_FILE.stat().st_size
-    if size_bytes >= 1_048_576:
-        size_str = f"{size_bytes / 1_048_576:.2f} MB"
-    else:
-        size_str = f"{size_bytes / 1_024:.1f} KB"
-
-    print(f"\nArchivo guardado: {OUT_FILE}")
-    print(f"  Filas:   {len(df):,}")
-    print(f"  Columnas:{len(df.columns)}")
-    print(f"  Tamano:  {size_str}")
-
+    print(f"\nArchivo de staging: {OUT_FILE}")
     return OUT_FILE
 
 
