@@ -16,7 +16,10 @@ Arquitectura de ejecución (rev. runner):
 Propiedades (constitución):
   - Idempotencia: ingesta sobrescribe el Parquet; el ETL hace TRUNCATE+INSERT;
     los marts DBT son `table` (full refresh); GE es de solo lectura; el populador
-    de ClickHouse hace TRUNCATE+INSERT.
+    de ClickHouse hace TRUNCATE+INSERT. Las etapas OP7/OP8/OP9 también lo son:
+    observabilidad reemplaza el período medido en Fact_Disponibilidad (DELETE
+    id_tiempo + INSERT); la inferencia ML hace upsert de predicciones por
+    (corrida, entidad); alertas deduplica por `clave` (no apila duplicados).
   - Reintentos: retries=2, retry_delay=2 min (default_args).
   - Sin catchup; un único run activo a la vez.
   - Fail-fast: GE staging/DW devuelven exit≠0 al fallar (quality/run_quality.py),
@@ -51,7 +54,7 @@ with DAG(
     start_date=datetime(2026, 1, 1),
     catchup=False,
     max_active_runs=1,
-    tags=["vinanalytics", "operativo", "OP1", "OP2", "OP3"],
+    tags=["vinanalytics", "operativo", "OP1", "OP2", "OP3", "OP7", "OP8", "OP9"],
 ) as dag:
 
     # OP1 · CU-O02 — PocketBase → stage/wine_raw.parquet (idempotente)
@@ -98,6 +101,32 @@ with DAG(
         bash_command=f"docker exec {RUNNER} python -m clickhouse.populate",
     )
 
+    # OP7 · CU-O11 — observabilidad: mide uptime/latencia REALES y persiste en
+    # Fact_Disponibilidad (StarRocks). Va TRAS el gate del DW (DW validado) y ANTES
+    # de las agregaciones, para que ClickHouse refleje el período medido el mismo
+    # ciclo (RN-803). Emite señal de SLO incumplido al bus de alertas (RN-802).
+    observabilidad = BashOperator(
+        task_id="observabilidad",
+        bash_command=f"docker exec {RUNNER} python -m observabilidad.monitor",
+    )
+
+    # OP8 · CU-O12 — inferencia ML programada (churn + precios) sobre el DW validado
+    # (RN-901). Persiste predicciones con versión+features (RF-805, idempotente) y
+    # emite señales de churn alto / precio anómalo (RN-903/904). exit≠0 si la corrida
+    # queda BLOQUEADA_POR_CALIDAD/FALLIDA (fail-fast).
+    ml_inferencia = BashOperator(
+        task_id="ml_inferencia",
+        bash_command=f"docker exec {RUNNER} python -m etl.ml_inference",
+    )
+
+    # OP9 · CU-O13 — motor de alertas: detecta anomalías (RF-901) y CONSUME el bus de
+    # señales que dejaron observabilidad (CU-O11) y ML (CU-O12), generando/agrupando
+    # la alerta (clasificación, dedup, enrutamiento, ciclo de vida).
+    alertas = BashOperator(
+        task_id="alertas",
+        bash_command=f"docker exec {RUNNER} python -m alertas.alert_engine",
+    )
+
     # OP11 · CU-O16 — reporte operativo diario, ÚLTIMO paso del flujo (RN-1203).
     # Lee SOLO agregaciones de ClickHouse (RN-1202) y verifica el sello de calidad
     # del día (RF-1104): exit≠0 (BLOQUEADO_SIN_CALIDAD/FALLIDO) marca la tarea fallida.
@@ -106,6 +135,9 @@ with DAG(
         bash_command=f"docker exec {RUNNER} python -m reportes.reporte_diario",
     )
 
-    # Orden FIJO del flujo de datos (Princ. IX); el reporte cierra el pipeline.
+    # Orden FIJO del flujo de datos (Princ. IX). Cadena observabilidad → ML → alertas
+    # (las métricas y predicciones alimentan la generación de alertas); el reporte
+    # cierra el pipeline.
     (ingesta >> calidad_staging >> etl_starrocks >> dbt_run >> dbt_test
-     >> calidad_dw >> agregaciones >> reporte_diario)
+     >> calidad_dw >> observabilidad >> agregaciones >> ml_inferencia
+     >> alertas >> reporte_diario)

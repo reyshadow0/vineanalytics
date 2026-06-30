@@ -130,6 +130,80 @@ COLLECTIONS: dict[str, list[dict]] = {
         _TEXT("documento"),                   # JSON del reporte (cifras + trazabilidad)
         _DATE("generado_en"),
     ],
+    # ── OP7 · observabilidad (CU-O11) ─────────────────────────────────────────
+    # Historial de incidentes con duración y región para el SLA mensual (RF-706).
+    # Las MEDICIONES (uptime/latencia) van a Fact_Disponibilidad en StarRocks; aquí
+    # solo el registro operacional del incidente.
+    "incidentes": [
+        _TEXT("clave", required=True),        # dedup determinista (servicio+periodo+region)
+        _TEXT("servicio", required=True),     # starrocks | clickhouse | pocketbase | ...
+        _TEXT("region"),                      # país/región (Dim_Mercado)
+        _NUM("id_mercado"),                   # → Dim_Mercado.id_mercado
+        _NUM("id_tiempo"),                    # período Dim_Tiempo
+        _TEXT("severidad"),                   # warning | critical
+        _TEXT("causa"),                       # caída de uptime | latencia elevada | servicio caído
+        _TEXT("estado"),                      # ABIERTO | RECUPERADO
+        _NUM("uptime"),                       # % medido en la ventana
+        _NUM("latencia_ms"),                  # latencia promedio medida
+        _NUM("duracion_min"),                 # duración estimada del incidente (RF-706)
+        _DATE("inicio"),
+        _DATE("fin"),
+    ],
+    # ── OP8 · machine-learning (CU-O12) ───────────────────────────────────────
+    # Registro de predicciones con su versión de modelo, features y score (RF-805,
+    # RN-902). Idempotente por (corrida, id_entidad). Las predicciones se sirven a
+    # dashboards SOLO vía ClickHouse (RN-905); aquí es la traza operacional.
+    "predicciones_ml": [
+        _TEXT("corrida", required=True),      # id determinista: modelo-version-id_tiempo
+        _TEXT("modelo", required=True),       # churn | precio
+        _TEXT("version_modelo", required=True),
+        _TEXT("entidad"),                     # cliente | variedad
+        _TEXT("id_entidad"),                  # clave natural de la entidad
+        _TEXT("nombre"),                      # etiqueta legible
+        _NUM("score"),                        # probabilidad / ajuste recomendado
+        _TEXT("nivel"),                       # Alto | Medio | Bajo (churn)
+        _NUM("umbral"),                       # umbral de disparo de alerta
+        _BOOL("supera_umbral"),               # score por encima del umbral
+        _TEXT("features"),                    # JSON de features usadas (explicabilidad)
+        _TEXT("periodo"),
+        _NUM("id_tiempo"),
+        _DATE("fecha"),
+    ],
+    # ── OP9 · alertas (CU-O13) ────────────────────────────────────────────────
+    # Bus de señales: cada paquete emisor (ML, observabilidad, ingesta, API,
+    # conversión) deja aquí una señal normalizada; `alertas` la consume (RF-902).
+    "senales_alerta": [
+        _TEXT("origen", required=True),       # machine-learning | observabilidad | ingesta | api | conversion
+        _TEXT("tipo", required=True),         # churn | precio | uptime | latencia | ingesta | api | conversion
+        _TEXT("severidad"),                   # info | warning | critical (sugerida)
+        _TEXT("causa"),
+        _TEXT("entidad"),                     # entidad afectada (cliente/variedad/servicio)
+        _TEXT("clave", required=True),        # dedup_key de la condición sostenida
+        _NUM("valor"),                        # valor observado
+        _NUM("umbral"),                       # umbral cruzado
+        _NUM("id_tiempo"),
+        _TEXT("payload"),                     # JSON con contexto adicional
+        _BOOL("procesada"),                   # la consumió `alertas`
+        _DATE("fecha"),
+    ],
+    # Registro/auditoría de cada alerta generada con su ciclo de vida (RF-904/907).
+    "alertas": [
+        _TEXT("tipo", required=True),         # churn | precio | uptime | latencia | ingesta | api | conversion
+        _TEXT("severidad", required=True),    # info | warning | critical (RF-903)
+        _TEXT("causa", required=True),
+        _TEXT("origen"),                      # paquete emisor
+        _TEXT("responsable"),                 # Customer Success | DevOps | Ingeniería de datos (RF-905)
+        _TEXT("entidad"),
+        _TEXT("clave", required=True),        # dedup_key (RF-906 / RN-1004)
+        _TEXT("estado", required=True),       # ABIERTA | RECONOCIDA | RESUELTA | SILENCIADA (RF-907)
+        _NUM("ocurrencias"),                  # nº de señales agrupadas (anti-tormenta)
+        _NUM("valor"),
+        _NUM("umbral"),
+        _NUM("id_tiempo"),
+        _TEXT("payload"),                     # JSON con contexto/trazabilidad (RNF-905)
+        _DATE("primera_vez"),
+        _DATE("ultima_vez"),
+    ],
 }
 
 # ── Semillas de catálogo (Dim_Plan / Dim_Estado_Suscripcion) ──────────────────
