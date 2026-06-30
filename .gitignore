@@ -1,0 +1,40 @@
+# ─── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# ─── Test / tooling cache ──────────────────────────────────
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ─── Datos de entrada (pesados, no versionar) ──────────────
+data/*
+!data/.gitkeep
+
+# ─── Artefactos del pipeline (regenerables) ────────────────
+stage/*
+!stage/.gitkeep
+
+# ─── Runtime: logs y respaldos ─────────────────────────────
+logs/*
+!logs/.gitkeep
+backups/*
+!backups/.gitkeep
+
+# ─── Entorno / secretos ────────────────────────────────────
+.env
+*.local
+
+# ─── SO / editor ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
