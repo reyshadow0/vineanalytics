@@ -266,10 +266,10 @@ def _bsc_kpi_row():
     return rows[0] if rows else None
 
 
-def bsc_kpis():
-    r = _bsc_kpi_row()
-    if r is None:
-        return None
+def bsc_kpis_payload(r):
+    """Construye el payload de tarjetas del BSC a partir de UNA fila de agg_bsc_kpis.
+    Lo comparten serving.bsc_kpis() (lee ClickHouse) y el fallback de app.py (lee la
+    vista DBT agg_bsc_kpis en StarRocks): las metas/umbrales viven en un solo lugar."""
     (periodo, activos, mrr_now, mrr_growth, api_share, cac_now, ltv_cac, cloud_cli,
      conv, churn, nps, adopcion, nuevos_trim, uptime, ttm, lat, calidad,
      horas, ddd, mlmod, rota, tecno) = r
@@ -311,6 +311,11 @@ def bsc_kpis():
     }
 
 
+def bsc_kpis():
+    r = _bsc_kpi_row()
+    return bsc_kpis_payload(r) if r is not None else None
+
+
 def v1_scorecard():
     r = _bsc_kpi_row()
     if r is None:
@@ -320,11 +325,10 @@ def v1_scorecard():
             "churn_pct": round(float(r[9]), 2), "uptime_pct": round(float(r[13]), 3)}
 
 
-def bsc_series():
-    rows = _q("""SELECT perspectiva, serie, etiqueta, orden, valor FROM agg_bsc_series
-                 ORDER BY perspectiva, serie, orden""")
-    if not rows:
-        return None
+def bsc_series_payload(rows):
+    """Arma el payload de series/rankings del BSC a partir de las filas largas de
+    agg_bsc_series. Compartido por serving.bsc_series() (ClickHouse) y el fallback
+    de app.py (vista DBT agg_bsc_series en StarRocks)."""
     grp: dict = {}
     for persp, serie, etiqueta, _orden, valor in rows:
         grp.setdefault(persp, {}).setdefault(serie, []).append([etiqueta, round(float(valor), 2)])
@@ -360,5 +364,68 @@ def bsc_series():
             "ingresos_partner": pares("ecosistema", "ingresos_partner"),
             "llamadas": pares("ecosistema", "llamadas"),
             "conexiones_partner": pares("ecosistema", "conexiones_partner"),
+        },
+    }
+
+
+def bsc_series():
+    rows = _q("""SELECT perspectiva, serie, etiqueta, orden, valor FROM agg_bsc_series
+                 ORDER BY perspectiva, serie, orden""")
+    if not rows:
+        return None
+    return bsc_series_payload(rows)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REPORTE OPERATIVO DIARIO (CU-O16 · OP11) — lectura SOLO de ClickHouse (RN-1202)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def reporte_diario_fuentes():
+    """Lee las cifras del reporte operativo diario desde las agregaciones ClickHouse.
+
+    SOLO ClickHouse (RN-1202): no hay fallback a StarRocks aquí (el reporte se
+    construye exclusivamente sobre la capa de serving). Devuelve un dict con las
+    cifras crudas y su período, o **None** si ClickHouse no está disponible o aún
+    no hay agregaciones del período (el reporte queda FALLIDO en ese caso).
+    """
+    op = _q("""SELECT id_tiempo, periodo, api_llamadas, api_errores, api_latencia_ms,
+                      api_ingreso, uso_sesiones, uso_funciones, uso_usuarios_activos,
+                      uso_dashboards, incidentes, uptime, despliegues
+               FROM agg_reporte_diario ORDER BY id_tiempo DESC LIMIT 1""")
+    if not op:
+        return None
+    o = op[0]
+
+    kv = _q("SELECT total_resenas, puntuacion_promedio FROM agg_kpis_vino LIMIT 1")
+    cal = _q("SELECT calidad FROM agg_bsc_kpis LIMIT 1")
+
+    return {
+        "periodo": o[1],
+        "id_tiempo": int(o[0]),
+        # Ingesta (agg_kpis_vino): filas cargadas al DW + calidad del DW (agg_bsc_kpis).
+        "ingesta": {
+            "resenas_en_dw": int(kv[0][0]) if kv else 0,
+            "puntuacion_promedio": float(kv[0][1]) if kv else 0.0,
+            "calidad_dw_pct": float(cal[0][0]) if cal else None,
+        },
+        # API (agg_reporte_diario ← Fact_Consumo_API).
+        "api": {
+            "llamadas": int(o[2] or 0),
+            "errores": int(o[3] or 0),
+            "latencia_ms": float(o[4] or 0),
+            "ingreso": float(o[5] or 0),
+        },
+        # Uso de plataforma (agg_reporte_diario ← Fact_Uso_Plataforma).
+        "uso": {
+            "sesiones": int(o[6] or 0),
+            "funciones": int(o[7] or 0),
+            "usuarios_activos": int(o[8] or 0),
+            "dashboards_vistos": int(o[9] or 0),
+        },
+        # Incidentes / disponibilidad (agg_reporte_diario ← Fact_Disponibilidad).
+        "incidentes": {
+            "incidentes": int(o[10] or 0),
+            "uptime_pct": float(o[11] or 0),
+            "despliegues": int(o[12] or 0),
         },
     }

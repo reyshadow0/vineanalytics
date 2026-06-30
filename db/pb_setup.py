@@ -118,6 +118,18 @@ COLLECTIONS: dict[str, list[dict]] = {
         _DATE("publicado_en"),
         _DATE("baja_en"),
     ],
+    # ── OP11 · reportes-operativos (CU-O16) ───────────────────────────────────
+    # Registro/archivo operacional del reporte diario (auditoría RN-1205). Las
+    # CIFRAS viven en ClickHouse; aquí solo el metadato + documento serializado.
+    "reportes_operativos": [
+        _TEXT("fecha", required=True),        # clave de upsert (un reporte por día)
+        _TEXT("periodo"),                     # período Dim_Tiempo consolidado
+        _TEXT("estado", required=True),       # PUBLICADO | BLOQUEADO_SIN_CALIDAD | FALLIDO
+        _BOOL("calidad_ok"),                  # RF-1104: gate de calidad del día
+        _TEXT("sello"),                       # id del sello de calidad CU-O04 usado
+        _TEXT("documento"),                   # JSON del reporte (cifras + trazabilidad)
+        _DATE("generado_en"),
+    ],
 }
 
 # ── Semillas de catálogo (Dim_Plan / Dim_Estado_Suscripcion) ──────────────────

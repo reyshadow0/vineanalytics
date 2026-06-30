@@ -90,11 +90,22 @@ with DAG(
         bash_command=f"docker exec {RUNNER} python -m quality.run_quality --dw",
     )
 
-    # OP3 — pobla las agregaciones de ClickHouse desde StarRocks (idempotente)
+    # OP3 — pobla las agregaciones de ClickHouse desde StarRocks (idempotente).
+    # populate.py ya NO calcula agregaciones: solo TRANSPORTA las vistas DBT
+    # serving.agg_* a ClickHouse (Princ. VI). La lógica vive en dbt_run.
     agregaciones = BashOperator(
         task_id="poblar_clickhouse",
         bash_command=f"docker exec {RUNNER} python -m clickhouse.populate",
     )
 
-    # Orden FIJO del flujo de datos (Princ. IX).
-    ingesta >> calidad_staging >> etl_starrocks >> dbt_run >> dbt_test >> calidad_dw >> agregaciones
+    # OP11 · CU-O16 — reporte operativo diario, ÚLTIMO paso del flujo (RN-1203).
+    # Lee SOLO agregaciones de ClickHouse (RN-1202) y verifica el sello de calidad
+    # del día (RF-1104): exit≠0 (BLOQUEADO_SIN_CALIDAD/FALLIDO) marca la tarea fallida.
+    reporte_diario = BashOperator(
+        task_id="reporte_diario",
+        bash_command=f"docker exec {RUNNER} python -m reportes.reporte_diario",
+    )
+
+    # Orden FIJO del flujo de datos (Princ. IX); el reporte cierra el pipeline.
+    (ingesta >> calidad_staging >> etl_starrocks >> dbt_run >> dbt_test
+     >> calidad_dw >> agregaciones >> reporte_diario)

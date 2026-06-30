@@ -1,0 +1,84 @@
+version: 2
+
+# Tests DBT en columnas clave de las agregaciones de serving (Princ. VI · RT-13):
+#   unique, not_null, accepted_values. Garantizan que la capa declarativa que
+#   reemplaza al SQL imperativo mantiene claves consistentes (una fila por
+#   país/variedad/.../período) tras cada `dbt run`.
+
+models:
+  # ── Vino ──────────────────────────────────────────────────────────────────
+  - name: agg_kpis_vino
+    description: "KPIs globales del catálogo de vino (una fila). Sustituye populate.py::_pop_vino."
+    columns:
+      - name: total_resenas
+        tests: [not_null]
+
+  - name: agg_pais
+    description: "Agregación por país (gráficas, browse, v1/mercados, comparar)."
+    columns:
+      - name: pais
+        tests: [not_null, unique]
+      - name: total
+        tests: [not_null]
+
+  - name: agg_variedad
+    description: "Agregación por variedad (lista + gráfica de precios)."
+    columns:
+      - name: variedad
+        tests: [not_null, unique]
+
+  - name: agg_bodega
+    description: "Agregación por bodega."
+    columns:
+      - name: bodega
+        tests: [not_null, unique]
+
+  - name: agg_region
+    description: "Agregación por región."
+    columns:
+      - name: region
+        tests: [not_null, unique]
+
+  - name: agg_puntuacion_hist
+    description: "Histograma de puntuación."
+    columns:
+      - name: puntuacion
+        tests: [not_null, unique]
+
+  - name: agg_tendencia_precio
+    description: "Precio promedio por año (del título) y variedad ('__ALL__' = global). Sustituye el SQL suelto de app.py::tendencias_precio."
+    columns:
+      - name: variedad
+        tests: [not_null]
+      - name: anio
+        tests: [not_null]
+
+  # ── Balanced Scorecard ──────────────────────────────────────────────────────
+  - name: agg_bsc_kpis
+    description: "KPIs del BSC del período más reciente (una fila). Sustituye _pop_bsc y app.py::api_bsc_kpis."
+    columns:
+      - name: periodo
+        tests: [not_null, unique]
+
+  - name: agg_bsc_series
+    description: "Series temporales y rankings del BSC (formato largo). Sustituye _pop_bsc y app.py::api_bsc_series."
+    columns:
+      - name: perspectiva
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['financiera', 'cliente', 'procesos', 'ecosistema']
+      - name: serie
+        tests: [not_null]
+      - name: valor
+        tests: [not_null]
+
+  # ── Reporte operativo diario (CU-O16 · OP11) ──────────────────────────────────
+  - name: agg_reporte_diario
+    description: "Consolidación operativa por Dim_Tiempo (API, uso, incidentes) para el reporte diario CU-O16."
+    columns:
+      - name: id_tiempo
+        description: "PK del período consolidado (Dim_Tiempo)."
+        tests: [not_null, unique]
+      - name: periodo
+        tests: [not_null]

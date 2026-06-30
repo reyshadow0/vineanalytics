@@ -105,3 +105,24 @@ CREATE TABLE IF NOT EXISTS vinanalytics.agg_bsc_series (
     orden                Int32,
     valor                Float64
 ) ENGINE = MergeTree ORDER BY (perspectiva, serie, orden);
+
+-- ── Reporte operativo diario (CU-O16 · OP11): consolidación por Dim_Tiempo ────
+--   Una fila por período con métricas de API (Fact_Consumo_API), uso
+--   (Fact_Uso_Plataforma) e incidentes/disponibilidad (Fact_Disponibilidad).
+--   La poblar.py la transporta desde la vista DBT serving.agg_reporte_diario.
+--   reportes/reporte_diario.py (CU-O16) lee SOLO de aquí (RN-1202).
+CREATE TABLE IF NOT EXISTS vinanalytics.agg_reporte_diario (
+    id_tiempo            Int32,
+    periodo              String,
+    api_llamadas         UInt64,
+    api_errores          UInt32,
+    api_latencia_ms      Float64,
+    api_ingreso          Float64,
+    uso_sesiones         UInt64,
+    uso_funciones        UInt64,
+    uso_usuarios_activos UInt32,
+    uso_dashboards       UInt64,
+    incidentes           UInt32,
+    uptime               Float64,
+    despliegues          UInt32
+) ENGINE = MergeTree ORDER BY id_tiempo;

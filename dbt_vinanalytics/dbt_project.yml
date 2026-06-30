@@ -17,11 +17,16 @@ clean-targets:
   - "dbt_packages"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Transformación declarativa CU-O03 (Princ. VI de la constitución).
+# Transformación declarativa CU-O03 + agregaciones de serving (Princ. VI).
 #   staging/ → vistas ligeras sobre las tablas StarRocks ya cargadas (sources).
 #   marts/   → modelo Fact-Dim curado y testeado (materializado como table).
-# Los nombres de marts NO colisionan con las tablas existentes
-# (fact_resenas, dim_pais, dim_variedad, ...): aquí son fct_* y dim_*_vino.
+#   serving/ → AGREGACIONES del dashboard/API/reporte (CU-O16), declarativas.
+#              Antes vivían como SQL imperativo en clickhouse/populate.py y
+#              duplicado en app.py; ahora son la ÚNICA fuente de la lógica de
+#              agregación. clickhouse/populate.py solo TRANSPORTA estas vistas a
+#              ClickHouse y app.py/serving.py solo LEEN (sin recalcular).
+#              Materializadas como `view`: siempre frescas, sin clave/distribución.
+# Los nombres NO colisionan con las tablas existentes (fct_*, dim_*_vino, agg_*).
 # ──────────────────────────────────────────────────────────────────────────────
 models:
   vinanalytics:
@@ -29,3 +34,5 @@ models:
       +materialized: view
     marts:
       +materialized: table
+    serving:
+      +materialized: view

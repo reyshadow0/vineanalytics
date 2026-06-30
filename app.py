@@ -340,35 +340,26 @@ def api_kpis():
     _ch = serving.kpis()
     if _ch is not None:
         return jsonify(_ch)
+    # Fallback (ClickHouse no disponible): lee la MISMA agregación desde la vista
+    # DBT en StarRocks (serving.agg_kpis_vino). Princ. VI: sin GROUP BY en Python.
     try:
-        row = _fetchone("""
-            SELECT
-                COUNT(*)                                                        AS total_resenas,
-                ROUND(AVG(CAST(points AS DOUBLE)), 1)                           AS puntuacion_promedio,
-                ROUND(AVG(CASE WHEN price > 0 THEN CAST(price AS DOUBLE) END), 2) AS precio_promedio,
-                MAX(CASE WHEN price > 0 THEN price END)                         AS precio_maximo,
-                MIN(CASE WHEN price > 0 THEN price END)                         AS precio_minimo
-            FROM fact_resenas
-        """)
-        total   = int(row[0] or 0)
-        avg_pts = float(row[1] or 0)
-        avg_prc = float(row[2] or 0)
-        max_prc = float(row[3] or 0)
-        min_prc = float(row[4] or 0)
-
-        n_paises     = int((_fetchone("SELECT COUNT(*) FROM dim_pais")      or [0])[0])
-        n_variedades = int((_fetchone("SELECT COUNT(*) FROM dim_variedad")  or [0])[0])
-        n_bodegas    = int((_fetchone("SELECT COUNT(*) FROM dim_bodega")    or [0])[0])
-
+        row = _fetchone("""SELECT total_resenas, puntuacion_promedio, precio_promedio,
+                                  precio_maximo, precio_minimo, total_paises,
+                                  total_variedades, total_bodegas
+                           FROM agg_kpis_vino LIMIT 1""")
+        if not row:
+            return jsonify({"total_resenas": 0, "puntuacion_promedio": 0, "precio_promedio": 0,
+                            "precio_maximo": 0, "precio_minimo": 0, "total_paises": 0,
+                            "total_variedades": 0, "total_bodegas": 0})
         return jsonify({
-            "total_resenas":       total,
-            "puntuacion_promedio": avg_pts,
-            "precio_promedio":     avg_prc,
-            "precio_maximo":       max_prc,
-            "precio_minimo":       min_prc,
-            "total_paises":        n_paises,
-            "total_variedades":    n_variedades,
-            "total_bodegas":       n_bodegas,
+            "total_resenas":       int(row[0] or 0),
+            "puntuacion_promedio": float(row[1] or 0),
+            "precio_promedio":     float(row[2] or 0),
+            "precio_maximo":       float(row[3] or 0),
+            "precio_minimo":       float(row[4] or 0),
+            "total_paises":        int(row[5] or 0),
+            "total_variedades":    int(row[6] or 0),
+            "total_bodegas":       int(row[7] or 0),
         })
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -441,13 +432,9 @@ def api_graficas_paises():
     _ch = serving.grafica_paises()
     if _ch is not None:
         return jsonify(_ch)
-    try:
-        rows = _fetchall("""
-            SELECT dp.nombre, ROUND(AVG(CAST(fr.points AS DOUBLE)),1) AS avg_pts, COUNT(*) AS total
-            FROM fact_resenas fr JOIN dim_pais dp ON fr.id_pais = dp.id_pais
-            WHERE dp.nombre != 'Desconocido'
-            GROUP BY dp.nombre ORDER BY avg_pts DESC LIMIT 15
-        """)
+    try:  # Fallback: vista DBT serving.agg_pais en StarRocks (sin GROUP BY en Python).
+        rows = _fetchall("""SELECT pais, puntuacion_promedio, total FROM agg_pais
+                            ORDER BY puntuacion_promedio DESC LIMIT 15""")
         return jsonify([{"pais": r[0], "puntuacion": float(r[1]), "total": int(r[2])} for r in rows])
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -458,13 +445,9 @@ def api_graficas_variedades():
     _ch = serving.grafica_variedades()
     if _ch is not None:
         return jsonify(_ch)
-    try:
-        rows = _fetchall("""
-            SELECT dv.nombre, ROUND(AVG(CAST(fr.price AS DOUBLE)),2) AS avg_price, COUNT(*) AS total
-            FROM fact_resenas fr JOIN dim_variedad dv ON fr.id_variedad = dv.id_variedad
-            WHERE fr.price > 0 AND dv.nombre != 'Desconocido'
-            GROUP BY dv.nombre ORDER BY avg_price DESC LIMIT 12
-        """)
+    try:  # Fallback: vista DBT serving.agg_variedad en StarRocks.
+        rows = _fetchall("""SELECT variedad, precio_promedio, total_con_precio FROM agg_variedad
+                            WHERE precio_promedio > 0 ORDER BY precio_promedio DESC LIMIT 12""")
         return jsonify([{"variedad": r[0], "precio_promedio": float(r[1]), "total": int(r[2])} for r in rows])
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -475,12 +458,8 @@ def api_graficas_puntuacion():
     _ch = serving.grafica_puntuacion()
     if _ch is not None:
         return jsonify(_ch)
-    try:
-        rows = _fetchall("""
-            SELECT points, COUNT(*) AS total
-            FROM fact_resenas
-            GROUP BY points ORDER BY points
-        """)
+    try:  # Fallback: vista DBT serving.agg_puntuacion_hist en StarRocks.
+        rows = _fetchall("SELECT puntuacion, total FROM agg_puntuacion_hist ORDER BY puntuacion")
         return jsonify([{"puntuacion": int(r[0]), "total": int(r[1])} for r in rows])
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -491,14 +470,9 @@ def api_graficas_bodegas():
     _ch = serving.grafica_bodegas()
     if _ch is not None:
         return jsonify(_ch)
-    try:
-        rows = _fetchall("""
-            SELECT db.nombre, ROUND(AVG(CAST(fr.points AS DOUBLE)),1) AS avg_pts, COUNT(*) AS total
-            FROM fact_resenas fr JOIN dim_bodega db ON fr.id_bodega = db.id_bodega
-            WHERE db.nombre != 'Desconocido'
-            GROUP BY db.nombre HAVING COUNT(*) >= 10
-            ORDER BY avg_pts DESC LIMIT 10
-        """)
+    try:  # Fallback: vista DBT serving.agg_bodega en StarRocks.
+        rows = _fetchall("""SELECT bodega, puntuacion_promedio, total FROM agg_bodega
+                            WHERE total >= 10 ORDER BY puntuacion_promedio DESC LIMIT 10""")
         return jsonify([{"bodega": r[0], "puntuacion": float(r[1]), "total": int(r[2])} for r in rows])
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -564,31 +538,27 @@ def api_graficas_comparar_mercados():
     _ch = serving.comparar_mercados(_paises)
     if _ch is not None:
         return jsonify(_ch)
+    # Fallback: vista DBT serving.agg_pais en StarRocks (sin recomputar por país).
     try:
         paises = [p.strip() for p in request.args.get("paises", "").split(",") if p.strip()][:4]
         if not paises:
             return jsonify([])
 
+        ph = ", ".join(["%s"] * len(paises))
+        rows = _fetchall(f"""SELECT pais, total, puntuacion_promedio, precio_promedio, variedades
+                             FROM agg_pais WHERE pais IN ({ph})""", tuple(paises))
+        por_pais = {r[0]: r for r in rows}
         result = []
         for pais in paises:
-            row = _fetchone("""
-                SELECT COUNT(*) AS total,
-                       ROUND(AVG(CAST(fr.points AS DOUBLE)), 1) AS avg_pts,
-                       ROUND(AVG(CASE WHEN fr.price > 0 THEN CAST(fr.price AS DOUBLE) END), 2) AS avg_price,
-                       COUNT(DISTINCT fr.id_variedad) AS variedades
-                FROM fact_resenas fr
-                JOIN dim_pais dp ON fr.id_pais = dp.id_pais
-                WHERE dp.nombre = %s
-            """, (pais,))
-            if row:
+            if pais in por_pais:
+                r = por_pais[pais]
                 result.append({
                     "pais":       pais,
-                    "total":      int(row[0] or 0),
-                    "puntuacion": float(row[1] or 0),
-                    "precio":     float(row[2] or 0),
-                    "variedades": int(row[3] or 0),
+                    "total":      int(r[1] or 0),
+                    "puntuacion": float(r[2] or 0),
+                    "precio":     float(r[3] or 0),
+                    "variedades": int(r[4] or 0),
                 })
-
         return jsonify(result)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -600,29 +570,12 @@ def api_graficas_tendencias_precio():
     try:
         variedad = request.args.get("variedad", "").strip()
 
-        if variedad:
-            rows = _fetchall("""
-                SELECT REGEXP_EXTRACT(fr.title, '(2[0-9]{3})', 1) AS yr,
-                       ROUND(AVG(CAST(fr.price AS DOUBLE)), 2) AS avg_price,
-                       COUNT(*) AS total
-                FROM fact_resenas fr
-                JOIN dim_variedad dv ON fr.id_variedad = dv.id_variedad
-                WHERE dv.nombre = %s AND fr.price > 0
-                  AND REGEXP_EXTRACT(fr.title, '(2[0-9]{3})', 1) != ''
-                GROUP BY yr
-                ORDER BY yr
-            """, (variedad,))
-        else:
-            rows = _fetchall("""
-                SELECT REGEXP_EXTRACT(title, '(2[0-9]{3})', 1) AS yr,
-                       ROUND(AVG(CAST(price AS DOUBLE)), 2) AS avg_price,
-                       COUNT(*) AS total
-                FROM fact_resenas
-                WHERE price > 0
-                  AND REGEXP_EXTRACT(title, '(2[0-9]{3})', 1) != ''
-                GROUP BY yr
-                ORDER BY yr
-            """)
+        # Princ. VI: la agregación (avg precio por año) vive en la vista DBT
+        # serving.agg_tendencia_precio; aquí solo se LEE y se calcula la regresión
+        # (presentación). '__ALL__' = agregado global (sin filtro de variedad).
+        clave = variedad if variedad else "__ALL__"
+        rows = _fetchall("""SELECT anio, precio_promedio, total FROM agg_tendencia_precio
+                            WHERE variedad = %s ORDER BY anio""", (clave,))
 
         historico = []
         for yr_str, avg_price, total in rows:
@@ -670,13 +623,8 @@ def api_paises():
     _ch = serving.paises()
     if _ch is not None:
         return jsonify(_ch)
-    try:
-        rows = _fetchall("""
-            SELECT dp.nombre, COUNT(*) AS n
-            FROM fact_resenas fr JOIN dim_pais dp ON fr.id_pais = dp.id_pais
-            WHERE dp.nombre != 'Desconocido'
-            GROUP BY dp.nombre ORDER BY n DESC
-        """)
+    try:  # Fallback: vista DBT serving.agg_pais en StarRocks.
+        rows = _fetchall("SELECT pais, total FROM agg_pais ORDER BY total DESC")
         return jsonify([{"nombre": r[0], "total": int(r[1])} for r in rows])
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -688,13 +636,8 @@ def api_variedades():
     _ch = serving.variedades()
     if _ch is not None:
         return jsonify(_ch)
-    try:
-        rows = _fetchall("""
-            SELECT dv.nombre, COUNT(*) AS n
-            FROM fact_resenas fr JOIN dim_variedad dv ON fr.id_variedad = dv.id_variedad
-            WHERE dv.nombre != 'Desconocido'
-            GROUP BY dv.nombre ORDER BY n DESC LIMIT 60
-        """)
+    try:  # Fallback: vista DBT serving.agg_variedad en StarRocks.
+        rows = _fetchall("SELECT variedad, total FROM agg_variedad ORDER BY total DESC LIMIT 60")
         return jsonify([{"nombre": r[0], "total": int(r[1])} for r in rows])
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -705,11 +648,11 @@ def api_browse():
     _ch = serving.browse()
     if _ch is not None:
         return jsonify(_ch)
-    try:
-        paises     = _fetchall("SELECT dp.nombre, COUNT(*) AS n FROM fact_resenas fr JOIN dim_pais dp ON fr.id_pais=dp.id_pais GROUP BY dp.nombre ORDER BY n DESC LIMIT 6")
-        variedades = _fetchall("SELECT dv.nombre, COUNT(*) AS n FROM fact_resenas fr JOIN dim_variedad dv ON fr.id_variedad=dv.id_variedad GROUP BY dv.nombre ORDER BY n DESC LIMIT 6")
-        bodegas    = _fetchall("SELECT db.nombre, COUNT(*) AS n FROM fact_resenas fr JOIN dim_bodega db ON fr.id_bodega=db.id_bodega WHERE db.nombre!='Desconocido' GROUP BY db.nombre ORDER BY n DESC LIMIT 6")
-        regiones   = _fetchall("SELECT dr.nombre, COUNT(*) AS n FROM fact_resenas fr JOIN dim_region dr ON fr.id_region=dr.id_region WHERE dr.nombre!='Desconocido' GROUP BY dr.nombre ORDER BY n DESC LIMIT 6")
+    try:  # Fallback: vistas DBT serving.agg_* en StarRocks (top 6 por total).
+        paises     = _fetchall("SELECT pais, total FROM agg_pais ORDER BY total DESC LIMIT 6")
+        variedades = _fetchall("SELECT variedad, total FROM agg_variedad ORDER BY total DESC LIMIT 6")
+        bodegas    = _fetchall("SELECT bodega, total FROM agg_bodega ORDER BY total DESC LIMIT 6")
+        regiones   = _fetchall("SELECT region, total FROM agg_region ORDER BY total DESC LIMIT 6")
         return jsonify({
             "paises":     [{"nombre": r[0], "total": int(r[1])} for r in paises],
             "variedades": [{"nombre": r[0], "total": int(r[1])} for r in variedades],
@@ -724,33 +667,10 @@ def api_browse():
 
 # ═════════════════════════════════════════════════════════════════════════════
 # BALANCED SCORECARD CORPORATIVO  (CU-E01 … CU-E08)
-# Alimentado por las tablas Fact-Dim de negocio (db/bsc_setup.py).
+# Alimentado por las agregaciones declarativas DBT (serving.agg_bsc_*), leídas de
+# ClickHouse vía serving.py con fallback a la vista StarRocks. app.py NO calcula
+# agregaciones del BSC: la lógica vive en dbt_vinanalytics/models/serving/ (Princ. VI).
 # ═════════════════════════════════════════════════════════════════════════════
-
-def _bsc_periodos():
-    """Devuelve (último, mismo_mes_año_anterior, primero) según dim_tiempo."""
-    row = _fetchone("SELECT MAX(id_tiempo), MIN(id_tiempo) FROM dim_tiempo")
-    if not row or row[0] is None:
-        return None, None, None
-    latest = int(row[0])
-    return latest, latest - 100, int(row[1])
-
-
-def _ult_periodos(n: int) -> list[int]:
-    rows = _fetchall(f"SELECT id_tiempo FROM dim_tiempo ORDER BY id_tiempo DESC LIMIT {n}")
-    return [int(r[0]) for r in rows]
-
-
-def _kpi(clave, etiqueta, valor, meta, unidad, mejor, sub=""):
-    """Construye una tarjeta de KPI con semáforo (verde/amarillo/rojo)."""
-    valor = round(float(valor or 0), 2)
-    if mejor == "mayor":
-        estado = "verde" if valor >= meta else ("amarillo" if valor >= meta * 0.9 else "rojo")
-    else:  # menor es mejor
-        estado = "verde" if valor <= meta else ("amarillo" if valor <= meta * 1.1 else "rojo")
-    return {"clave": clave, "etiqueta": etiqueta, "valor": valor, "meta": meta,
-            "unidad": unidad, "mejor": mejor, "estado": estado, "sub": sub}
-
 
 @app.route("/balanced-scorecard")
 def balanced_scorecard():
@@ -779,100 +699,18 @@ def api_bsc_kpis():
     _ch = serving.bsc_kpis()
     if _ch is not None:
         return jsonify(_ch)
+    # Fallback: lee la MISMA agregación desde la vista DBT serving.agg_bsc_kpis en
+    # StarRocks y reutiliza el formateador de tarjetas de serving (metas/umbrales en
+    # un solo lugar). Princ. VI: el cálculo de KPIs ya no se duplica aquí.
     try:
-        latest, prev_year, first = _bsc_periodos()
-        if latest is None:
+        row = _fetchone("""SELECT periodo, clientes_activos, mrr_actual, mrr_growth, api_share,
+                                  cac, ltv_cac, cloud_cli, conversion, churn, nps, adopcion,
+                                  nuevos_trim, uptime, ttm, latencia, calidad,
+                                  horas, ddd, mlmod, rotacion, tecno
+                           FROM agg_bsc_kpis LIMIT 1""")
+        if not row:
             return jsonify({"disponible": False})
-
-        def val(sql, params=()):
-            r = _fetchone(sql, params)
-            return float(r[0]) if r and r[0] is not None else 0.0
-
-        # ── Financiera ───────────────────────────────────────────────────────
-        mrr_now  = val("SELECT SUM(mrr) FROM fact_suscripcion WHERE id_tiempo=%s AND es_churn=0", (latest,))
-        mrr_prev = val("SELECT SUM(mrr) FROM fact_suscripcion WHERE id_tiempo=%s AND es_churn=0", (prev_year,))
-        mrr_growth = ((mrr_now / mrr_prev) - 1) * 100 if mrr_prev else 0
-        api_now  = val("SELECT SUM(ingreso_api) FROM fact_consumo_api WHERE id_tiempo=%s", (latest,))
-        api_share = api_now / (mrr_now + api_now) * 100 if (mrr_now + api_now) else 0
-        cac_now  = val("SELECT AVG(cac) FROM fact_conversion WHERE id_tiempo=%s AND conversiones>0", (latest,))
-        ltv_now  = val("SELECT AVG(ltv) FROM fact_retencion WHERE id_tiempo=%s AND activo=1", (latest,))
-        ltv_cac  = ltv_now / cac_now if cac_now else 0
-        cloud    = val("SELECT SUM(costo_cloud) FROM fact_disponibilidad WHERE id_tiempo=%s", (latest,))
-        activos  = val("SELECT SUM(activo) FROM fact_retencion WHERE id_tiempo=%s", (latest,)) or 1
-        cloud_cli = cloud / activos
-
-        # ── Cliente ──────────────────────────────────────────────────────────
-        cv = _fetchone("SELECT SUM(conversiones), SUM(leads) FROM fact_conversion WHERE id_tiempo=%s", (latest,))
-        conv = (float(cv[0]) / float(cv[1]) * 100) if cv and cv[1] else 0
-        rt = _fetchone("SELECT SUM(cancelacion), SUM(activo) FROM fact_retencion WHERE id_tiempo=%s", (latest,))
-        churn = (float(rt[0]) / (float(rt[1]) + float(rt[0])) * 100) if rt and (rt[0] or rt[1]) else 0
-        npsr = _fetchone("""SELECT SUM(CASE WHEN nps_score>=9 THEN 1 ELSE 0 END),
-                                   SUM(CASE WHEN nps_score BETWEEN 0 AND 6 THEN 1 ELSE 0 END),
-                                   SUM(CASE WHEN nps_score>=0 THEN 1 ELSE 0 END)
-                            FROM fact_uso_plataforma WHERE id_tiempo=%s""", (latest,))
-        nps = ((float(npsr[0]) - float(npsr[1])) / float(npsr[2]) * 100) if npsr and npsr[2] else 0
-        adr = _fetchone("SELECT SUM(usuarios_activos), SUM(usuarios_totales) FROM fact_uso_plataforma WHERE id_tiempo=%s", (latest,))
-        adopcion = (float(adr[0]) / float(adr[1]) * 100) if adr and adr[1] else 0
-        u3 = _ult_periodos(3)
-        nuevos_trim = val(f"SELECT SUM(es_nuevo) FROM fact_suscripcion WHERE id_tiempo IN ({','.join(map(str,u3))})") if u3 else 0
-
-        # ── Procesos internos ────────────────────────────────────────────────
-        dp = _fetchone("SELECT AVG(uptime), AVG(time_to_market_dias), AVG(latencia_ms) FROM fact_disponibilidad WHERE id_tiempo=%s", (latest,))
-        uptime = float(dp[0]) if dp and dp[0] is not None else 0
-        ttm    = float(dp[1]) if dp and dp[1] is not None else 0
-        lat    = float(dp[2]) if dp and dp[2] is not None else 0
-        cq = _fetchone("SELECT SUM(CASE WHEN points BETWEEN 80 AND 100 THEN 1 ELSE 0 END), COUNT(*) FROM fact_resenas")
-        calidad = (float(cq[0]) / float(cq[1]) * 100) if cq and cq[1] else 100.0
-
-        # ── Aprendizaje y crecimiento ────────────────────────────────────────
-        ap = _fetchone("""SELECT horas_capacitacion, decisiones_data_driven,
-                                 tecnologias_adoptadas, rotacion_personal, modelos_ml_produccion
-                          FROM fact_aprendizaje WHERE id_tiempo=%s""", (latest,))
-        horas = float(ap[0]) if ap else 0
-        ddd   = float(ap[1]) if ap else 0
-        tecno = float(ap[2]) if ap else 0
-        rota  = float(ap[3]) if ap else 0
-        mlmod = float(ap[4]) if ap else 0
-
-        per = _fetchone("SELECT periodo FROM dim_tiempo WHERE id_tiempo=%s", (latest,))
-        periodo = per[0] if per else str(latest)
-
-        return jsonify({
-            "disponible": True,
-            "periodo": periodo,
-            "clientes_activos": int(activos),
-            "mrr_actual": round(mrr_now, 2),
-            "perspectivas": {
-                "financiera": [
-                    _kpi("mrr_growth", "Crecimiento de MRR", mrr_growth, 30, "%", "mayor", f"MRR ${mrr_now:,.0f}/mes"),
-                    _kpi("api_share",  "Ingresos vía API",   api_share,  35, "%", "mayor", "% de ingresos totales"),
-                    _kpi("cac",        "CAC internacional",  cac_now,  1200, "$", "menor", "objetivo −20 % i.a."),
-                    _kpi("ltv_cac",    "Ratio LTV / CAC",    ltv_cac,     3, "x", "mayor", "valor de vida / costo"),
-                    _kpi("cloud",      "Costo cloud / cliente", cloud_cli, 50, "$", "menor", "FinOps · −15 % anual"),
-                ],
-                "cliente": [
-                    _kpi("conversion", "Conversión del embudo", conv,    8, "%", "mayor", "clientes / leads"),
-                    _kpi("churn",      "Tasa de churn",         churn,   4, "%", "menor", "cancelaciones mensuales"),
-                    _kpi("nps",        "Net Promoter Score",    nps,    50, "",  "mayor", "satisfacción del cliente"),
-                    _kpi("adopcion",   "Adopción plataforma",   adopcion,70, "%", "mayor", "usuarios activos / totales"),
-                    _kpi("nuevos",     "Nuevos clientes (trim)", nuevos_trim, 15, "", "mayor", "últimos 3 meses"),
-                ],
-                "procesos": [
-                    _kpi("uptime",   "Disponibilidad (Uptime)", uptime, 99.9, "%",  "mayor", "nube multi-región"),
-                    _kpi("ttm",      "Time-to-market",          ttm,       1, "d",  "menor", "commit → producción"),
-                    _kpi("latencia", "Latencia global",         lat,     200, "ms", "menor", "promedio por región"),
-                    _kpi("apis",     "APIs documentadas (SDD)", 100,     100, "%",  "mayor", "contrato OpenAPI"),
-                    _kpi("calidad",  "Calidad del Data Warehouse", calidad, 98, "%", "mayor", "registros válidos"),
-                ],
-                "aprendizaje": [
-                    _kpi("horas",   "Horas de capacitación",   horas, 32, "h", "mayor", "run-rate anual / persona"),
-                    _kpi("ddd",     "Decisiones data-driven",  ddd,   80, "%", "mayor", "con respaldo analítico"),
-                    _kpi("mlmod",   "Modelos ML en producción", mlmod, 6, "",  "mayor", "pipeline MLOps"),
-                    _kpi("rotacion","Rotación de personal",    rota,  10, "%", "menor", "talento técnico"),
-                    _kpi("tecno",   "Tecnologías adoptadas",   tecno,  4, "",  "mayor", "roadmap de innovación"),
-                ],
-            },
-        })
+        return jsonify(serving.bsc_kpis_payload(row))
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
@@ -883,50 +721,15 @@ def api_bsc_series():
     _ch = serving.bsc_series()
     if _ch is not None:
         return jsonify(_ch)
+    # Fallback: lee la MISMA agregación de series desde la vista DBT
+    # serving.agg_bsc_series en StarRocks y reutiliza el armador de serving.
+    # Princ. VI: las 16 consultas de series ya no se duplican aquí.
     try:
-        latest, _prev, _first = _bsc_periodos()
-        if latest is None:
+        rows = _fetchall("""SELECT perspectiva, serie, etiqueta, orden, valor FROM agg_bsc_series
+                            ORDER BY perspectiva, serie, orden""")
+        if not rows:
             return jsonify({"disponible": False})
-
-        def pares(sql, params=()):
-            return [[r[0], round(float(r[1] or 0), 2)] for r in _fetchall(sql, params)]
-
-        T = "JOIN dim_tiempo t ON f.id_tiempo = t.id_tiempo"
-
-        financiera = {
-            "mrr": pares(f"SELECT t.periodo, SUM(f.mrr) FROM fact_suscripcion f {T} WHERE f.es_churn=0 GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-            "api": pares(f"SELECT t.periodo, SUM(f.ingreso_api) FROM fact_consumo_api f {T} GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-            "cac": pares(f"SELECT t.periodo, AVG(f.cac) FROM fact_conversion f {T} WHERE f.conversiones>0 GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-            "por_plan": pares("SELECT p.nombre, SUM(f.mrr) FROM fact_suscripcion f JOIN dim_plan p ON f.id_plan=p.id_plan WHERE f.id_tiempo=%s AND f.es_churn=0 GROUP BY p.nombre ORDER BY 2 DESC", (latest,)),
-        }
-        cliente = {
-            "nuevos_mercado": pares("SELECT m.pais, SUM(f.es_nuevo) FROM fact_suscripcion f JOIN dim_cliente c ON f.id_cliente=c.id_cliente JOIN dim_mercado m ON c.id_mercado=m.id_mercado GROUP BY m.pais ORDER BY 2 DESC LIMIT 12"),
-            "conversion": pares(f"SELECT t.periodo, SUM(f.conversiones)*100.0/SUM(f.leads) FROM fact_conversion f {T} GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-            "churn": pares(f"SELECT t.periodo, SUM(f.cancelacion)*100.0/(SUM(f.activo)+SUM(f.cancelacion)) FROM fact_retencion f {T} GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-            "nps": pares(f"SELECT t.periodo, (SUM(CASE WHEN f.nps_score>=9 THEN 1 ELSE 0 END)-SUM(CASE WHEN f.nps_score BETWEEN 0 AND 6 THEN 1 ELSE 0 END))*100.0/SUM(CASE WHEN f.nps_score>=0 THEN 1 ELSE 0 END) FROM fact_uso_plataforma f {T} GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-        }
-        emb = _fetchone("SELECT SUM(leads), SUM(oportunidades), SUM(conversiones) FROM fact_conversion WHERE id_tiempo=%s", (latest,))
-        cliente["embudo"] = [int(emb[0] or 0), int(emb[1] or 0), int(emb[2] or 0)] if emb else [0, 0, 0]
-
-        procesos = {
-            "uptime": pares(f"SELECT t.periodo, AVG(f.uptime) FROM fact_disponibilidad f {T} GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-            "ttm": pares(f"SELECT t.periodo, AVG(f.time_to_market_dias) FROM fact_disponibilidad f {T} GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-            "latencia_region": pares("SELECT m.region_geo, AVG(f.latencia_ms) FROM fact_disponibilidad f JOIN dim_mercado m ON f.id_mercado=m.id_mercado WHERE f.id_tiempo=%s GROUP BY m.region_geo ORDER BY 2 DESC", (latest,)),
-            "incidentes": pares(f"SELECT t.periodo, SUM(f.incidentes) FROM fact_disponibilidad f {T} GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-        }
-        ecosistema = {
-            "ingresos_partner": pares("SELECT p.nombre, SUM(f.ingreso_api) FROM fact_consumo_api f JOIN dim_partner_api p ON f.id_partner=p.id_partner GROUP BY p.nombre ORDER BY 2 DESC"),
-            "llamadas": pares(f"SELECT t.periodo, SUM(f.llamadas) FROM fact_consumo_api f {T} GROUP BY t.periodo, t.id_tiempo ORDER BY t.id_tiempo"),
-            "conexiones_partner": pares("SELECT p.nombre, MAX(f.conexiones_activas) FROM fact_integracion_partner f JOIN dim_partner_api p ON f.id_partner=p.id_partner WHERE f.id_tiempo=%s GROUP BY p.nombre ORDER BY 2 DESC", (latest,)),
-        }
-
-        return jsonify({
-            "disponible": True,
-            "financiera": financiera,
-            "cliente": cliente,
-            "procesos": procesos,
-            "ecosistema": ecosistema,
-        })
+        return jsonify(serving.bsc_series_payload(rows))
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
@@ -982,6 +785,63 @@ def api_ml_anomalias():
     try:
         from etl.ml_models import detectar_anomalias
         return jsonify(detectar_anomalias())
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# REPORTE OPERATIVO DIARIO  (OP11 · CU-O16)
+# Consolida ingesta/API/uso/incidentes SOLO desde ClickHouse (RN-1202), con gate
+# de calidad CU-O04 (RF-1104). La generación oficial corre como último paso del
+# DAG; estos endpoints exponen la vista (tablero) y el export del Administrador.
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _reporte_diario_payload():
+    """Devuelve el reporte del día. Con `?fecha=AAAA-MM-DD` lee el archivado
+    (reproducibilidad RN-1205); sin fecha, lo genera en vivo en modo solo-lectura
+    (sin archivar ni persistir). Solo-ClickHouse para las cifras (RN-1202)."""
+    import json as _json
+    from reportes import reporte_diario as rd
+    fecha = request.args.get("fecha")
+    if fecha:
+        f = rd.ARCHIVO_DIR / f"reporte_diario_{fecha}.json"
+        if not f.exists():
+            return None, f"Sin reporte archivado para {fecha}."
+        return _json.loads(f.read_text(encoding="utf-8")), None
+    return rd.generar(persistir=False, archivar_fn=lambda r: None), None
+
+
+@app.route("/api/reporte-diario")
+def api_reporte_diario():
+    """CU-O16 — Reporte operativo diario (tablero/export) para el Administrador."""
+    if session.get("rol") != "admin":
+        return jsonify({"error": "no autorizado"}), 403
+    try:
+        rep, err = _reporte_diario_payload()
+        if err:
+            return jsonify({"error": err}), 404
+        return jsonify(rep)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/reporte-diario")
+def reporte_diario_export():
+    """Export del reporte diario (JSON descargable) — RF-1105."""
+    if session.get("rol") != "admin":
+        return redirect(url_for("auth.login", next="/reporte-diario"))
+    try:
+        import json as _json
+        rep, err = _reporte_diario_payload()
+        if err:
+            return jsonify({"error": err}), 404
+        from flask import Response
+        nombre = f"reporte_diario_{rep.get('fecha', 'hoy')}.json"
+        return Response(
+            _json.dumps(rep, ensure_ascii=False, indent=2),
+            mimetype="application/json; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename={nombre}"},
+        )
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
@@ -1073,13 +933,9 @@ def api_v1_mercados():
     _ch = serving.v1_mercados()
     if _ch is not None:
         return jsonify(_ch)
-    try:
-        rows = _fetchall("""SELECT dp.nombre, COUNT(*),
-                                   ROUND(AVG(CAST(fr.points AS DOUBLE)),1),
-                                   ROUND(AVG(CASE WHEN fr.price>0 THEN CAST(fr.price AS DOUBLE) END),2)
-                            FROM fact_resenas fr JOIN dim_pais dp ON fr.id_pais=dp.id_pais
-                            WHERE dp.nombre!='Desconocido'
-                            GROUP BY dp.nombre ORDER BY COUNT(*) DESC LIMIT 50""")
+    try:  # Fallback: vista DBT serving.agg_pais en StarRocks.
+        rows = _fetchall("""SELECT pais, total, puntuacion_promedio, precio_promedio
+                            FROM agg_pais ORDER BY total DESC LIMIT 50""")
         return jsonify({"api_version": "1.0",
                         "data": [{"mercado": r[0], "resenas": int(r[1]),
                                   "puntuacion_promedio": float(r[2]),
@@ -1106,23 +962,15 @@ def api_v1_scorecard():
     _ch = serving.v1_scorecard()
     if _ch is not None:
         return jsonify(_ch)
+    # Fallback: vista DBT serving.agg_bsc_kpis en StarRocks (sin recomputar).
     try:
-        latest, prev_year, _ = _bsc_periodos()
-        if latest is None:
+        row = _fetchone("""SELECT mrr_actual, clientes_activos, churn, uptime
+                           FROM agg_bsc_kpis LIMIT 1""")
+        if not row:
             return jsonify({"api_version": "1.0", "disponible": False})
-
-        def val(sql, p=()):
-            r = _fetchone(sql, p)
-            return float(r[0]) if r and r[0] is not None else 0.0
-
-        mrr  = val("SELECT SUM(mrr) FROM fact_suscripcion WHERE id_tiempo=%s AND es_churn=0", (latest,))
-        act  = val("SELECT SUM(activo) FROM fact_retencion WHERE id_tiempo=%s", (latest,))
-        rt   = _fetchone("SELECT SUM(cancelacion),SUM(activo) FROM fact_retencion WHERE id_tiempo=%s", (latest,))
-        churn = (float(rt[0]) / (float(rt[1]) + float(rt[0])) * 100) if rt and (rt[0] or rt[1]) else 0
-        up   = val("SELECT AVG(uptime) FROM fact_disponibilidad WHERE id_tiempo=%s", (latest,))
         return jsonify({"api_version": "1.0", "disponible": True,
-                        "mrr_mensual": round(mrr, 2), "clientes_activos": int(act),
-                        "churn_pct": round(churn, 2), "uptime_pct": round(up, 3)})
+                        "mrr_mensual": round(float(row[0]), 2), "clientes_activos": int(row[1]),
+                        "churn_pct": round(float(row[2]), 2), "uptime_pct": round(float(row[3]), 3)})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 

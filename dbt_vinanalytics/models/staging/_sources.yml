@@ -27,3 +27,41 @@ sources:
         description: "Región / denominación de origen."
       - name: dim_catador
         description: "Catador / sumiller fuente de la reseña."
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Modelo de negocio (Balanced Scorecard) en StarRocks: tablas Fact-Dim
+  # operativas que alimentan las agregaciones de serving (agg_bsc_* y el
+  # reporte diario CU-O16). Creadas por db/bsc_setup.py y pobladas por la
+  # semilla sintética etl/bsc_generator.py (excepción documentada al Princ. VI).
+  # Declararlas como sources da el origen del linaje (Princ. VII).
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: dw_negocio
+    description: "Modelo Fact-Dim de negocio (BSC) en StarRocks: suscripción, uso, API, disponibilidad, etc."
+    schema: "{{ env_var('STARROCKS_DB', 'retailytics') }}"
+    tables:
+      - name: dim_tiempo
+        description: "Dim_Tiempo — calendario por período (AAAAMM)."
+      - name: dim_plan
+        description: "Dim_Plan — planes de suscripción."
+      - name: dim_mercado
+        description: "Dim_Mercado — país/región geográfica del cliente."
+      - name: dim_cliente
+        description: "Dim_Cliente — cuenta B2B."
+      - name: dim_partner_api
+        description: "Dim_Partner_API — integrador/consumidor de la API."
+      - name: fact_suscripcion
+        description: "Fact_Suscripcion — MRR y ciclo de vida de la suscripción."
+      - name: fact_uso_plataforma
+        description: "Fact_Uso_Plataforma — sesiones, funciones, usuarios, NPS."
+      - name: fact_consumo_api
+        description: "Fact_Consumo_API — llamadas, latencia, errores, ingreso API."
+      - name: fact_conversion
+        description: "Fact_Conversion — embudo leads→oportunidades→conversiones, CAC."
+      - name: fact_retencion
+        description: "Fact_Retencion — activos, cancelaciones, LTV, riesgo de churn."
+      - name: fact_disponibilidad
+        description: "Fact_Disponibilidad — uptime, latencia, incidentes, despliegues, TTM."
+      - name: fact_integracion_partner
+        description: "Fact_Integracion_Partner — conexiones activas e ingreso por partner."
+      - name: fact_aprendizaje
+        description: "Fact_Aprendizaje — capacitación, decisiones data-driven, ML en producción."

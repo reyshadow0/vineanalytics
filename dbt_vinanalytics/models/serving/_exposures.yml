@@ -1,0 +1,24 @@
+version: 2
+
+# Linaje de extremo a extremo (Princ. VII · checklist reportes-operativos §3).
+# Declara el reporte operativo diario (CU-O16) como `exposure` de dbt: hace
+# visible en `dbt docs` que el reporte depende de las agregaciones de serving,
+# que a su vez descienden de los marts Fact-Dim y de los sources del DW.
+
+exposures:
+  - name: reporte_operativo_diario
+    label: "Reporte operativo diario (CU-O16 · OP11)"
+    type: dashboard
+    maturity: high
+    url: "http://localhost:5000/reporte-diario"
+    description: >
+      Reporte diario que consolida ingesta, consumo de API, uso de plataforma e
+      incidentes del período, leído SOLO de las agregaciones de ClickHouse
+      (RN-1202) y bloqueado si el día no pasó el gate de calidad CU-O04 (RF-1104).
+    depends_on:
+      - ref('agg_reporte_diario')
+      - ref('agg_kpis_vino')
+      - ref('agg_bsc_kpis')
+    owner:
+      name: Administrador
+      email: ops@vinanalytics.example
