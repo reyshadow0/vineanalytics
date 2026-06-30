@@ -54,7 +54,7 @@ with DAG(
     start_date=datetime(2026, 1, 1),
     catchup=False,
     max_active_runs=1,
-    tags=["vinanalytics", "operativo", "OP1", "OP2", "OP3", "OP7", "OP8", "OP9"],
+    tags=["vinanalytics", "operativo", "OP1", "OP2", "OP3", "OP6", "OP7", "OP8", "OP9"],
 ) as dag:
 
     # OP1 · CU-O02 — PocketBase → stage/wine_raw.parquet (idempotente)
@@ -101,6 +101,16 @@ with DAG(
         bash_command=f"docker exec {RUNNER} python -m clickhouse.populate",
     )
 
+    # OP6 · CU-O09 — ejecución automatizada de campañas de captación (RF-602,
+    # RNF-601): registra impresiones/clics/gasto/leads en eventos_campana (PocketBase),
+    # que el ETL proyecta a Fact_Campana. Acción operacional independiente del DW;
+    # idempotente (upsert por campaña+período). No falla el DAG si no hay campañas
+    # programadas vencidas (exit 0).
+    captacion_ejecucion = BashOperator(
+        task_id="captacion_ejecucion",
+        bash_command=f"docker exec {RUNNER} python -m campaigns_runner",
+    )
+
     # OP7 · CU-O11 — observabilidad: mide uptime/latencia REALES y persiste en
     # Fact_Disponibilidad (StarRocks). Va TRAS el gate del DW (DW validado) y ANTES
     # de las agregaciones, para que ClickHouse refleje el período medido el mismo
@@ -135,9 +145,10 @@ with DAG(
         bash_command=f"docker exec {RUNNER} python -m reportes.reporte_diario",
     )
 
-    # Orden FIJO del flujo de datos (Princ. IX). Cadena observabilidad → ML → alertas
-    # (las métricas y predicciones alimentan la generación de alertas); el reporte
-    # cierra el pipeline.
+    # Orden FIJO del flujo de datos (Princ. IX). Tras el gate del DW se ejecutan las
+    # acciones operacionales: campañas (OP6) y observabilidad (OP7) antes de las
+    # agregaciones; luego ML → alertas (las métricas/predicciones alimentan las
+    # alertas) y el reporte cierra el pipeline.
     (ingesta >> calidad_staging >> etl_starrocks >> dbt_run >> dbt_test
-     >> calidad_dw >> observabilidad >> agregaciones >> ml_inferencia
-     >> alertas >> reporte_diario)
+     >> calidad_dw >> captacion_ejecucion >> observabilidad >> agregaciones
+     >> ml_inferencia >> alertas >> reporte_diario)

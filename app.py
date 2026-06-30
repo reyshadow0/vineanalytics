@@ -1547,6 +1547,168 @@ def api_uso_clientes():
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# CU-O09 / CU-O10 (OP6) — Captación (campañas) y conversión del embudo
+# Lógica en models_captacion.py (capa operacional PocketBase). Una campaña/conversión
+# se asocia a un canal y mercado EXISTENTES; los eventos llegan a Fact_Campana/
+# Fact_Conversion vía ETL (RNF-603). Atribución first-touch única (RN-703) y
+# anti-doble-conteo por (lead, etapa). Sin escribir al DW (no se saltan capas).
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _err_captacion(e):
+    """Mapea un CaptacionError al HTTP: 404 inexistente, 409 transición/etapa."""
+    import models_captacion as cap
+    code = 404 if isinstance(e, (cap.CampanaInexistente, cap.LeadInexistente,
+                                 cap.CanalInexistente, cap.MercadoInexistente)) else 409
+    return jsonify({"status": "error", "codigo": e.codigo,
+                    "message": e.mensaje, "detalle": e.detalle}), code
+
+
+@app.route("/campanas", methods=["GET", "POST"])
+def campanas():
+    import models_captacion as cap
+    from pb_client import get_client
+    if request.method == "GET":
+        filtros = {}
+        for k in ("estado", "canal", "mercado"):
+            if request.args.get(k):
+                filtros[k] = request.args[k]
+        try:
+            return jsonify({"status": "ok",
+                            "campanas": get_client().find("campanas", **filtros)})
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 502
+
+    denied = _rol_permitido("admin", "gerente")
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        camp = cap.crear_campana(
+            d.get("nombre", ""), d.get("canal", ""), d.get("mercado", ""),
+            segmento=d.get("segmento", ""), presupuesto=d.get("presupuesto", 0),
+            programacion=d.get("programacion", ""),
+            responsable=session.get("username", "Growth & Marketing"))
+        _audit("CAMPANA_CREADA",
+               f"campana={camp['id']} canal={camp['canal']} mercado={camp['mercado']}")
+        return jsonify({"status": "ok", "campana": camp}), 201
+    except cap.CaptacionError as e:
+        return _err_captacion(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/campanas/<cid>/programar", methods=["POST"])
+def campanas_programar(cid):
+    import models_captacion as cap
+    denied = _rol_permitido("admin", "gerente")
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        camp = cap.programar_campana(cid, d.get("programacion", ""))
+        _audit("CAMPANA_PROGRAMADA", f"campana={cid} prog={camp.get('programacion')}")
+        return jsonify({"status": "ok", "campana": camp})
+    except cap.CaptacionError as e:
+        return _err_captacion(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/campanas/<cid>/ejecutar", methods=["POST"])
+def campanas_ejecutar(cid):
+    """RF-602/RF-603 — ejecuta una corrida y registra métricas (eventos_campana)."""
+    import models_captacion as cap
+    denied = _rol_permitido("admin", "gerente")
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        res = cap.ejecutar_campana(cid, metricas=d.get("metricas"),
+                                   periodo=d.get("periodo"))
+        _audit("CAMPANA_EJECUTADA",
+               f"campana={cid} corrida={res['corrida']} evento={res['evento']['id']}")
+        return jsonify({"status": "ok", **res})
+    except cap.CaptacionError as e:
+        return _err_captacion(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/campanas/<cid>/estado", methods=["POST"])
+def campanas_estado(cid):
+    import models_captacion as cap
+    denied = _rol_permitido("admin", "gerente")
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        camp = cap.cambiar_estado_campana(cid, d.get("estado", ""))
+        _audit("CAMPANA_ESTADO", f"campana={cid} -> {camp['estado']}")
+        return jsonify({"status": "ok", "campana": camp})
+    except cap.CaptacionError as e:
+        return _err_captacion(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/leads", methods=["POST"])
+def leads_registrar():
+    """RF-604/RN-702 — registra un lead deduplicado, atribuido a la campaña que lo captó."""
+    import models_captacion as cap
+    denied = _rol_permitido("admin", "gerente")
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        res = cap.registrar_lead(d.get("clave", ""), d.get("campana", ""),
+                                 prospecto=d.get("prospecto", ""))
+        return jsonify({"status": "ok", **res}), (200 if res["duplicado"] else 201)
+    except cap.CaptacionError as e:
+        return _err_captacion(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/conversiones", methods=["POST"])
+def conversiones_registrar():
+    """RF-605/RF-606 — registra una conversión atribuida a su campaña/canal de origen.
+    Anti-doble-conteo: la misma conversión del lead en la misma etapa no se duplica."""
+    import models_captacion as cap
+    denied = _rol_permitido("admin", "gerente")
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        res = cap.registrar_conversion(
+            d.get("lead", ""), d.get("etapa", ""),
+            fuente=d.get("fuente", "embudo"),
+            resultado=d.get("resultado", "en_progreso"))
+        _audit("CONVERSION_REGISTRADA",
+               f"lead={d.get('lead')} etapa={d.get('etapa')} "
+               f"contada={res['contada']} campana={res['atribucion']['campana']}")
+        return jsonify({"status": "ok", **res}), (201 if res["contada"] else 200)
+    except cap.CaptacionError as e:
+        return _err_captacion(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/captacion/indicadores", methods=["GET"])
+def captacion_indicadores():
+    """RF-607/RN-704 — insumos de CAC y tasa de conversión (fórmulas canónicas)."""
+    import models_captacion as cap
+    denied = _rol_permitido("admin", "gerente", "analista")
+    if denied:
+        return denied
+    periodo = request.args.get("periodo")
+    try:
+        ind = cap.indicadores_captacion(int(periodo) if periodo else None)
+        return jsonify({"status": "ok", "indicadores": ind})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # OP3 · CU-O05 construir dashboard / CU-O06 publicar a la cuenta del cliente
 # Lectura analítica SOLO de ClickHouse (serving) con fallback a StarRocks (RT-01).
 # Publicación bloqueada sin sello de calidad vigente (RN-401, regla dura).

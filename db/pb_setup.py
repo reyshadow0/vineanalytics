@@ -238,6 +238,84 @@ COLLECTIONS: dict[str, list[dict]] = {
         _DATE("creado_en"),
         _DATE("actualizado_en"),
     ],
+    # ── OP6 · captacion-conversion (CU-O09 / CU-O10) ──────────────────────────
+    # Catálogo de canales de adquisición (Dim_Canal_Adquisicion). Una campaña y
+    # una conversión SOLO pueden referirse a un canal EXISTENTE (RN-701, RN-703).
+    "canales_adquisicion": [
+        _TEXT("codigo", required=True),        # organico|pago|referido|marketplace|partner
+        _TEXT("nombre", required=True),
+        _NUM("id_canal", required=True),       # → Dim_Canal_Adquisicion.id_canal
+    ],
+    # Catálogo de mercados/regiones (Dim_Mercado). Una campaña pertenece a un
+    # mercado existente (RN-701) y la conversión se registra por mercado (RF-605).
+    "mercados": [
+        _TEXT("codigo", required=True),        # nombre de país usado como clave
+        _TEXT("pais", required=True),
+        _TEXT("region"),                       # región geográfica
+        _NUM("id_mercado", required=True),     # → Dim_Mercado.id_mercado
+    ],
+    # Configuración de campaña (Dim_Campana, RF-601). Estado: BORRADOR→PROGRAMADA→
+    # EN_EJECUCION→FINALIZADA (o PAUSADA, reanudable). Pertenece a canal+mercado
+    # existentes (RN-701). Las MÉTRICAS no viven aquí: se acumulan en eventos_campana.
+    "campanas": [
+        _TEXT("nombre", required=True),
+        _TEXT("canal", required=True),         # codigo en `canales_adquisicion` (RN-701)
+        _TEXT("mercado", required=True),        # codigo/pais en `mercados` (RN-701)
+        _TEXT("segmento"),                      # SMB|Mid-Market|Enterprise
+        _NUM("presupuesto"),                    # gasto planificado (USD)
+        _TEXT("programacion"),                  # ISO datetime de lanzamiento
+        _TEXT("estado", required=True),         # BORRADOR|PROGRAMADA|EN_EJECUCION|PAUSADA|FINALIZADA
+        _NUM("ejecuciones"),                    # nº de corridas (reanudable, RNF-601)
+        _TEXT("responsable"),                   # Growth & Marketing
+        _DATE("creado_en"),
+        _DATE("actualizado_en"),
+    ],
+    # Feed de métricas → Fact_Campana (vía ETL, RF-603). Idempotente por
+    # (campana, id_tiempo): re-ejecutar el período UPSERTA la fila, no la duplica
+    # (anti-doble-conteo). 1 fila por campaña y período Dim_Tiempo, como Fact_Campana.
+    "eventos_campana": [
+        _TEXT("campana", required=True),        # id en `campanas`
+        _TEXT("canal"),                         # → Dim_Canal_Adquisicion
+        _TEXT("mercado"),                       # → Dim_Mercado
+        _NUM("id_tiempo"),                      # período Dim_Tiempo (YYYYMM)
+        _TEXT("clave", required=True),          # dedup determinista (campana+id_tiempo)
+        _NUM("corrida"),                        # nº de corrida acumulada (auditoría reanudable)
+        _NUM("impresiones"),
+        _NUM("clics"),
+        _NUM("gasto"),
+        _NUM("leads"),
+        _DATE("fecha"),
+    ],
+    # Leads captados (RF-604). Deduplicados por `clave` natural del prospecto
+    # (RN-702): un mismo prospecto = un solo lead. Lleva la campaña/canal de ORIGEN
+    # (atribución first-touch, RN-703); una segunda campaña NO re-atribuye (Esc-604).
+    "leads": [
+        _TEXT("clave", required=True),          # clave natural del prospecto (dedup RN-702)
+        _TEXT("prospecto"),                     # etiqueta legible (empresa/contacto)
+        _TEXT("campana_origen"),                # campaña que lo captó (atribución única)
+        _TEXT("canal_origen"),                  # canal de adquisición de origen
+        _TEXT("mercado"),
+        _TEXT("etapa", required=True),          # LEAD|OPORTUNIDAD|CLIENTE|PERDIDO
+        _NUM("id_tiempo"),
+        _DATE("creado_en"),
+        _DATE("actualizado_en"),
+    ],
+    # Feed del embudo → Fact_Conversion (vía ETL, RF-605). Idempotente por
+    # (lead, etapa): la MISMA conversión de un lead en la MISMA etapa NO se cuenta
+    # dos veces (regla del enunciado). Atribuida a la campaña/canal de origen (RF-606).
+    "eventos_conversion": [
+        _TEXT("lead", required=True),           # id en `leads`
+        _TEXT("clave", required=True),          # dedup determinista (lead+etapa)
+        _TEXT("etapa", required=True),          # LEAD|OPORTUNIDAD|CLIENTE|PERDIDO
+        _TEXT("fuente"),                        # fuente del evento del embudo
+        _TEXT("resultado"),                     # ganado|perdido|en_progreso
+        _TEXT("campana_atribuida"),             # RF-606 atribución única
+        _TEXT("canal"),                         # → Dim_Canal_Adquisicion
+        _TEXT("mercado"),                       # → Dim_Mercado
+        _TEXT("cliente"),                       # id en `clientes` si culmina en alta (RF-608)
+        _NUM("id_tiempo"),
+        _DATE("fecha"),
+    ],
     # Registro/auditoría de cada alerta generada con su ciclo de vida (RF-904/907).
     "alertas": [
         _TEXT("tipo", required=True),         # churn | precio | uptime | latencia | ingesta | api | conversion
@@ -272,6 +350,32 @@ ESTADOS_SEED = [
     {"codigo": "CANCELADA", "nombre": "Cancelada", "id_estado": 4},
 ]
 
+# ── Semillas de catálogo de captación (Dim_Canal_Adquisicion / Dim_Mercado) ───
+# Alineadas con los ids de los catálogos del DW (etl/bsc_generator.py) para que la
+# proyección ETL eventos_*→Fact_* sea consistente (CU-O09/CU-O10, OP6).
+CANALES_SEED = [
+    {"codigo": "organico",    "nombre": "Orgánico",    "id_canal": 1},
+    {"codigo": "pago",        "nombre": "Pago",        "id_canal": 2},
+    {"codigo": "referido",    "nombre": "Referido",    "id_canal": 3},
+    {"codigo": "marketplace", "nombre": "Marketplace", "id_canal": 4},
+    {"codigo": "partner",     "nombre": "Partner",     "id_canal": 5},
+]
+
+MERCADOS_SEED = [
+    {"codigo": "Argentina",      "pais": "Argentina",      "region": "América Latina", "id_mercado": 1},
+    {"codigo": "Chile",          "pais": "Chile",          "region": "América Latina", "id_mercado": 2},
+    {"codigo": "México",         "pais": "México",         "region": "América Latina", "id_mercado": 3},
+    {"codigo": "Brasil",         "pais": "Brasil",         "region": "América Latina", "id_mercado": 4},
+    {"codigo": "Perú",           "pais": "Perú",           "region": "América Latina", "id_mercado": 5},
+    {"codigo": "Colombia",       "pais": "Colombia",       "region": "América Latina", "id_mercado": 6},
+    {"codigo": "España",         "pais": "España",         "region": "Europa",         "id_mercado": 7},
+    {"codigo": "Italia",         "pais": "Italia",         "region": "Europa",         "id_mercado": 8},
+    {"codigo": "Francia",        "pais": "Francia",        "region": "Europa",         "id_mercado": 9},
+    {"codigo": "Portugal",       "pais": "Portugal",       "region": "Europa",         "id_mercado": 10},
+    {"codigo": "Estados Unidos", "pais": "Estados Unidos", "region": "Norteamérica",   "id_mercado": 11},
+    {"codigo": "Australia",      "pais": "Australia",      "region": "Oceanía",        "id_mercado": 12},
+]
+
 
 def _seed(client: PBClient, collection: str, rows: list[dict], key: str) -> int:
     creados = 0
@@ -295,11 +399,15 @@ def setup(client: PBClient | None = None) -> dict:
 
     n_planes = _seed(client, "planes", PLANES_SEED, "codigo")
     n_estados = _seed(client, "estados_suscripcion", ESTADOS_SEED, "codigo")
+    n_canales = _seed(client, "canales_adquisicion", CANALES_SEED, "codigo")
+    n_mercados = _seed(client, "mercados", MERCADOS_SEED, "codigo")
 
     return {
         "colecciones_creadas": creadas,
         "planes_sembrados": n_planes,
         "estados_sembrados": n_estados,
+        "canales_sembrados": n_canales,
+        "mercados_sembrados": n_mercados,
     }
 
 
