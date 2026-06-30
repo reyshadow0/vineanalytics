@@ -74,6 +74,13 @@ AGGS: list[tuple[str, list[tuple[str, str]]]] = [
     ("agg_bsc_series", [
         ("perspectiva", "s"), ("serie", "s"), ("etiqueta", "s"), ("orden", "i"), ("valor", "f"),
     ]),
+    ("agg_uso_cliente", [
+        ("id_cliente", "i"), ("nombre", "s"), ("id_plan", "i"), ("periodos", "i"),
+        ("sesiones", "i"), ("dashboards_vistos", "i"), ("funciones_total", "i"),
+        ("funciones_promedio", "f"), ("usuarios_activos", "i"), ("usuarios_totales", "i"),
+        ("frecuencia_sesiones", "f"), ("adopcion_pct", "f"), ("nps_promedio", "f"),
+        ("ultimo_periodo", "i"),
+    ]),
     ("agg_reporte_diario", [
         ("id_tiempo", "i"), ("periodo", "s"), ("api_llamadas", "i"), ("api_errores", "i"),
         ("api_latencia_ms", "f"), ("api_ingreso", "f"), ("uso_sesiones", "i"),

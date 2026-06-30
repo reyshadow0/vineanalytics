@@ -377,6 +377,56 @@ def bsc_series():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# USO / ADOPCIÓN POR CLIENTE (CU-O15 · OP10) — agregado de Fact_Uso_Plataforma
+# Lee de agg_uso_cliente (ClickHouse) con fallback a la misma vista en StarRocks
+# (RN-1102: uso consultado AGREGADO, nunca eventos crudos saltando capas).
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Lista de columnas única (la comparten serving y el fallback StarRocks de app.py).
+USO_CLIENTE_COLS = ("id_cliente, nombre, id_plan, periodos, sesiones, dashboards_vistos, "
+                    "funciones_total, funciones_promedio, usuarios_activos, "
+                    "usuarios_totales, frecuencia_sesiones, adopcion_pct, "
+                    "nps_promedio, ultimo_periodo")
+
+
+def uso_cliente_row_to_dict(r) -> dict:
+    """Mapea una fila de agg_uso_cliente (mismo orden en ClickHouse y StarRocks)."""
+    return {
+        "id_cliente": int(r[0] or 0), "nombre": r[1] or "",
+        "id_plan": int(r[2] or 0), "periodos": int(r[3] or 0),
+        "sesiones": int(r[4] or 0), "dashboards_vistos": int(r[5] or 0),
+        "funciones_total": int(r[6] or 0), "funciones_promedio": float(r[7] or 0),
+        "usuarios_activos": int(r[8] or 0), "usuarios_totales": int(r[9] or 0),
+        "frecuencia_sesiones": float(r[10] or 0), "adopcion_pct": float(r[11] or 0),
+        "nps_promedio": float(r[12] or 0), "ultimo_periodo": int(r[13] or 0),
+    }
+
+
+def uso_por_cliente(id_cliente):
+    """RF-1005/CA-1103: uso/adopción de UN cliente desde ClickHouse. None si no está
+    disponible o el cliente no tiene uso → app.py cae a StarRocks (misma vista agg)."""
+    try:
+        cid = int(id_cliente)
+    except (TypeError, ValueError):
+        return None
+    rows = _q(f"SELECT {USO_CLIENTE_COLS} FROM agg_uso_cliente "
+              f"WHERE id_cliente = {cid} LIMIT 1")
+    if not rows:
+        return None
+    return uso_cliente_row_to_dict(rows[0])
+
+
+def uso_clientes(limite: int = 200):
+    """HU-04: uso agregado de TODOS los clientes (orden por sesiones). None si CH
+    no está disponible (el endpoint cae a StarRocks)."""
+    rows = _q(f"SELECT {USO_CLIENTE_COLS} FROM agg_uso_cliente "
+              f"ORDER BY sesiones DESC LIMIT {int(limite)}")
+    if rows is None:
+        return None
+    return [uso_cliente_row_to_dict(r) for r in rows]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # REPORTE OPERATIVO DIARIO (CU-O16 · OP11) — lectura SOLO de ClickHouse (RN-1202)
 # ══════════════════════════════════════════════════════════════════════════════
 

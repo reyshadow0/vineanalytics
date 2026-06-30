@@ -1235,6 +1235,13 @@ def clientes():
     try:
         cli = mc.crear_cliente(datos)
         _audit("ALTA_CLIENTE", f"cliente={cli['id']} {cli.get('razon_social','')}")
+        # CU-O14 · RN-1104: toda cuenta nueva de OP5 dispara su onboarding (best-effort,
+        # idempotente). No bloquea el alta si PocketBase de customer-success no responde.
+        try:
+            import models_customer_success as cs
+            cs.iniciar_onboarding(cli["id"])
+        except Exception as _e:
+            print(f"[WARN] Onboarding automático (CU-O14) no registrado: {_e}")
         return jsonify({"status": "ok", "cliente": cli}), 201
     except mc.ReglaNegocioError as e:
         return jsonify({"status": "error", "codigo": e.codigo,
@@ -1316,6 +1323,227 @@ def clientes_acceso(cid):
         return jsonify({"status": "ok", "acceso": mc.acceso_vigente(cid)})
     except Exception as exc:
         return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CU-O14 (OP10) — Onboarding y tickets de soporte (capa operacional PocketBase)
+# Lógica en models_customer_success.py. Onboarding/tickets se asocian a una CUENTA
+# EXISTENTE (clientes de CU-O08); el uso/adopción se consulta agregado (CU-O15).
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _err_cs(e):
+    """Mapea un CustomerSuccessError al código HTTP: 404 cuenta/registro inexistente,
+    409 transición/NPS inválidos."""
+    import models_customer_success as cs
+    code = 404 if isinstance(e, (cs.CuentaInexistente, cs.RegistroInexistente)) else 409
+    return jsonify({"status": "error", "codigo": e.codigo,
+                    "message": e.mensaje, "detalle": e.detalle}), code
+
+
+@app.route("/onboarding", methods=["GET", "POST"])
+def onboarding():
+    import models_customer_success as cs
+    from pb_client import get_client
+    if request.method == "GET":
+        filtros = {}
+        if request.args.get("cuenta"):
+            filtros["cuenta"] = request.args["cuenta"]
+        try:
+            return jsonify({"status": "ok",
+                            "onboarding": get_client().find("onboarding", **filtros)})
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 502
+
+    denied = _solo_admin()
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        onb = cs.iniciar_onboarding(d.get("cuenta_id") or d.get("cuenta", ""),
+                                    pasos=d.get("pasos"))
+        _audit("ONBOARDING_INICIADO", f"cuenta={onb['cuenta']} onboarding={onb['id']}")
+        return jsonify({"status": "ok", "onboarding": onb}), 201
+    except cs.CustomerSuccessError as e:
+        return _err_cs(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/onboarding/<oid>/avanzar", methods=["POST"])
+def onboarding_avanzar(oid):
+    import models_customer_success as cs
+    denied = _solo_admin()
+    if denied:
+        return denied
+    try:
+        onb = cs.avanzar_onboarding(oid)
+        _audit("ONBOARDING_AVANCE", f"onboarding={oid} estado={onb['estado']}")
+        return jsonify({"status": "ok", "onboarding": onb})
+    except cs.CustomerSuccessError as e:
+        return _err_cs(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/tickets", methods=["GET", "POST"])
+def tickets():
+    import models_customer_success as cs
+    from pb_client import get_client
+    if request.method == "GET":
+        filtros = {}
+        if request.args.get("cuenta"):
+            filtros["cuenta"] = request.args["cuenta"]
+        try:
+            return jsonify({"status": "ok",
+                            "tickets": get_client().find("tickets", **filtros)})
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 502
+
+    denied = _solo_admin()
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        tk = cs.abrir_ticket(
+            d.get("cuenta_id") or d.get("cuenta", ""),
+            d.get("asunto", ""),
+            categoria=d.get("categoria", "consulta"),
+            prioridad=d.get("prioridad", "media"),
+            usuario=session.get("username", "cs"))
+        _audit("TICKET_ABIERTO", f"ticket={tk['id']} cuenta={tk['cuenta']} prio={tk['prioridad']}")
+        return jsonify({"status": "ok", "ticket": tk}), 201
+    except cs.CustomerSuccessError as e:
+        return _err_cs(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/tickets/<tid>/estado", methods=["POST"])
+def tickets_estado(tid):
+    import models_customer_success as cs
+    denied = _solo_admin()
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        tk = cs.transicionar_ticket(tid, d.get("estado", ""))
+        _audit("TICKET_TRANSICION", f"ticket={tid} -> {tk['estado']}")
+        return jsonify({"status": "ok", "ticket": tk})
+    except cs.CustomerSuccessError as e:
+        return _err_cs(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/tickets/<tid>/satisfaccion", methods=["POST"])
+def tickets_satisfaccion(tid):
+    import models_customer_success as cs
+    denied = _solo_admin()
+    if denied:
+        return denied
+    d = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        tk = cs.registrar_satisfaccion(tid, d.get("nps"), d.get("comentario", ""))
+        _audit("TICKET_NPS", f"ticket={tid} nps={tk.get('nps')}")
+        return jsonify({"status": "ok", "ticket": tk})
+    except cs.CustomerSuccessError as e:
+        return _err_cs(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/clientes/<cid>/soporte", methods=["GET"])
+def clientes_soporte(cid):
+    """RF-1007/CA-1105 — reporte de adopción/soporte por cuenta (parte operacional)."""
+    import models_customer_success as cs
+    try:
+        return jsonify({"status": "ok", "soporte": cs.reporte_soporte(cid)})
+    except cs.CustomerSuccessError as e:
+        return _err_cs(e)
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+@app.route("/clientes/<cid>/retencion", methods=["POST"])
+def clientes_retencion(cid):
+    """RF-1006/RN-1103 — vincula una acción de retención a la alerta de churn viva
+    de la cuenta. `cid` es el identificador (entidad) que porta la alerta de churn."""
+    import models_customer_success as cs
+    denied = _solo_admin()
+    if denied:
+        return denied
+    try:
+        res = cs.vincular_retencion(cid)
+        if res.get("vinculada"):
+            _audit("RETENCION_VINCULADA", f"cuenta={cid} alerta={res.get('alerta')}")
+        return jsonify({"status": "ok", "retencion": res})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 502
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CU-O15 (OP10) — Consultar uso/adopción de la plataforma por cliente
+# Lee agg_uso_cliente de ClickHouse (serving) con fallback a la misma vista DBT en
+# StarRocks (RT-01). RN-1102: uso AGREGADO, nunca eventos crudos saltando capas.
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _uso_cliente_starrocks(cid) -> dict:
+    """Fallback de lectura (capa DW): lee la vista DBT agg_uso_cliente. Sigue siendo
+    el AGREGADO (RN-1102), no los eventos crudos de fact_uso_plataforma."""
+    try:
+        row = _fetchone(
+            f"SELECT {serving.USO_CLIENTE_COLS} FROM agg_uso_cliente "
+            f"WHERE id_cliente = %s LIMIT 1", (int(cid),))
+        return serving.uso_cliente_row_to_dict(row) if row else {}
+    except Exception:
+        return {}
+
+
+@app.route("/api/uso/<cid>")
+def api_uso_cliente(cid):
+    """CU-O15 — uso/adopción de un cliente (sesiones, funciones, frecuencia) con la
+    prioridad de retención si tiene una alerta de churn viva (RF-1005/RF-1006)."""
+    denied = _rol_permitido("admin", "analista", "gerente")
+    if denied:
+        return denied
+    uso = serving.uso_por_cliente(cid)
+    fuente = "clickhouse"
+    if uso is None:                       # ClickHouse caído o sin uso → fallback DW
+        uso = _uso_cliente_starrocks(cid)
+        fuente = "starrocks"
+    if not uso:
+        return jsonify({"status": "error",
+                        "message": f"Sin uso registrado para el cliente {cid}"}), 404
+
+    # RF-1006/RN-1103: acompaña el uso con la prioridad de retención (sin efectos).
+    try:
+        import models_customer_success as cs
+        retencion = cs.evaluar_retencion(uso.get("nombre", ""))
+    except Exception:
+        retencion = {"prioridad": "normal", "en_riesgo": False, "alerta": None}
+
+    return jsonify({"status": "ok", "fuente": fuente, "uso": uso,
+                    "retencion": retencion})
+
+
+@app.route("/api/uso")
+def api_uso_clientes():
+    """CU-O15 / HU-04 — uso agregado de todos los clientes (analista de datos)."""
+    denied = _rol_permitido("admin", "analista", "gerente")
+    if denied:
+        return denied
+    data = serving.uso_clientes()
+    fuente = "clickhouse"
+    if data is None:                      # fallback a la vista DBT en StarRocks
+        fuente = "starrocks"
+        try:
+            rows = _fetchall(
+                f"SELECT {serving.USO_CLIENTE_COLS} FROM agg_uso_cliente "
+                f"ORDER BY sesiones DESC LIMIT 200")
+            data = [serving.uso_cliente_row_to_dict(r) for r in rows]
+        except Exception:
+            data = []
+    return jsonify({"status": "ok", "fuente": fuente, "clientes": data})
 
 
 # ═════════════════════════════════════════════════════════════════════════════

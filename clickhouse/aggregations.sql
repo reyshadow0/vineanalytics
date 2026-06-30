@@ -106,6 +106,28 @@ CREATE TABLE IF NOT EXISTS vinanalytics.agg_bsc_series (
     valor                Float64
 ) ENGINE = MergeTree ORDER BY (perspectiva, serie, orden);
 
+-- ── Uso/adopción por cliente (CU-O15 · OP10): una fila por Dim_Cliente ────────
+--   Sesiones, dashboards, funciones, frecuencia, adopción y NPS agregados desde
+--   Fact_Uso_Plataforma. populate.py la transporta desde la vista DBT
+--   serving.agg_uso_cliente. CU-O15 (serving.uso_por_cliente) lee de aquí (RN-1102:
+--   uso consultado AGREGADO, nunca eventos crudos saltando capas).
+CREATE TABLE IF NOT EXISTS vinanalytics.agg_uso_cliente (
+    id_cliente           Int32,
+    nombre               String,
+    id_plan              Int32,
+    periodos             Int32,
+    sesiones             UInt64,
+    dashboards_vistos    UInt64,
+    funciones_total      UInt64,
+    funciones_promedio   Float64,
+    usuarios_activos     Int32,
+    usuarios_totales     Int32,
+    frecuencia_sesiones  Float64,
+    adopcion_pct         Float64,
+    nps_promedio         Float64,
+    ultimo_periodo       Int32
+) ENGINE = MergeTree ORDER BY id_cliente;
+
 -- ── Reporte operativo diario (CU-O16 · OP11): consolidación por Dim_Tiempo ────
 --   Una fila por período con métricas de API (Fact_Consumo_API), uso
 --   (Fact_Uso_Plataforma) e incidentes/disponibilidad (Fact_Disponibilidad).

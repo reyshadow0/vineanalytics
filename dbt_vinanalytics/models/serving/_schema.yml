@@ -73,6 +73,18 @@ models:
       - name: valor
         tests: [not_null]
 
+  # ── Uso/adopción por cliente (CU-O15 · OP10) ──────────────────────────────────
+  - name: agg_uso_cliente
+    description: "Uso/adopción por Dim_Cliente desde Fact_Uso_Plataforma (sesiones, funciones, frecuencia, adopción, NPS) para CU-O15. Lo consulta serving.uso_por_cliente."
+    columns:
+      - name: id_cliente
+        description: "PK del cliente (Dim_Cliente). Una fila por cliente."
+        tests: [not_null, unique]
+      - name: sesiones
+        tests: [not_null]
+      - name: frecuencia_sesiones
+        tests: [not_null]
+
   # ── Reporte operativo diario (CU-O16 · OP11) ──────────────────────────────────
   - name: agg_reporte_diario
     description: "Consolidación operativa por Dim_Tiempo (API, uso, incidentes) para el reporte diario CU-O16."

@@ -186,6 +186,58 @@ COLLECTIONS: dict[str, list[dict]] = {
         _BOOL("procesada"),                   # la consumió `alertas`
         _DATE("fecha"),
     ],
+    # ── OP10 · customer-success (CU-O14) ──────────────────────────────────────
+    # Onboarding de la cuenta (RF-1001). Se asocia a una cuenta EXISTENTE de
+    # CU-O08 (`clientes`); 1 onboarding por cuenta (idempotente, RN-1104). Las
+    # MÉTRICAS de adopción se consultan agregadas en ClickHouse (CU-O15, RN-1102);
+    # aquí vive solo el seguimiento operacional del proceso.
+    "onboarding": [
+        _TEXT("cuenta", required=True),        # id en `clientes` (RN-1104)
+        _TEXT("estado", required=True),        # PENDIENTE|EN_PROGRESO|COMPLETADO|ESTANCADO
+        _TEXT("paso"),                         # paso actual
+        _NUM("pasos_completados"),
+        _NUM("pasos_totales"),
+        _TEXT("pasos"),                        # JSON con la lista de pasos
+        _TEXT("responsable"),                  # Customer Success
+        _TEXT("notas"),
+        _DATE("iniciado_en"),
+        _DATE("actualizado_en"),
+        _DATE("completado_en"),
+    ],
+    # Tickets de soporte (RF-1002): clasificación, prioridad, tiempos (RF-1003) y
+    # satisfacción/NPS (RF-1004). Ciclo de vida en RN-1101. Asociado a `clientes`.
+    "tickets": [
+        _TEXT("cuenta", required=True),        # id en `clientes`
+        _TEXT("asunto", required=True),
+        _TEXT("categoria"),                    # incidencia|consulta|solicitud|facturacion
+        _TEXT("prioridad"),                    # baja|media|alta|critica
+        _TEXT("estado", required=True),        # ABIERTO|EN_PROCESO|RESUELTO|CERRADO|REABIERTO
+        _TEXT("responsable"),                  # Customer Success
+        _TEXT("usuario"),                      # quién registró (auditoría)
+        _NUM("nps"),                           # 0..10 (RF-1004); -1 = sin respuesta
+        _TEXT("satisfaccion"),                 # promotor|pasivo|detractor
+        _DATE("abierto_en"),
+        _DATE("primera_respuesta_en"),
+        _DATE("resuelto_en"),
+        _DATE("cerrado_en"),
+        _DATE("reabierto_en"),
+        _NUM("tiempo_primera_respuesta_min"),  # RF-1003
+        _NUM("tiempo_resolucion_min"),         # RF-1003
+    ],
+    # Acción de retención vinculada a una alerta de churn (RF-1006 / RN-1103).
+    # Idempotente por (cuenta, alerta): una alerta de churn viva prioriza UNA acción.
+    "acciones_retencion": [
+        _TEXT("cuenta", required=True),        # id/nombre de la cuenta en riesgo
+        _TEXT("alerta"),                       # id de la alerta de churn (OP9)
+        _TEXT("tipo"),                         # churn
+        _TEXT("severidad"),
+        _TEXT("causa"),
+        _TEXT("prioridad"),                    # alta (proviene de churn critical)
+        _TEXT("estado", required=True),        # PENDIENTE|EN_CURSO|COMPLETADA
+        _TEXT("responsable"),                  # Customer Success
+        _DATE("creado_en"),
+        _DATE("actualizado_en"),
+    ],
     # Registro/auditoría de cada alerta generada con su ciclo de vida (RF-904/907).
     "alertas": [
         _TEXT("tipo", required=True),         # churn | precio | uptime | latencia | ingesta | api | conversion
